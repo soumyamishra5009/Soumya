@@ -1,0 +1,82 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database with pgvector
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: syncforge-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: syncforge
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis for Celery Broker/Backend
+  redis:
+    image: redis:7-alpine
+    container_name: syncforge-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Judge0 CE - Code Execution Sandbox (Optional)
+  # Uncomment to use self-hosted code execution
+  # judge0_db:
+  #   image: postgres:16-alpine
+  #   container_name: syncforge-judge0-db
+  #   environment:
+  #     POSTGRES_DB: judge0
+  #     POSTGRES_USER: judge0
+  #     POSTGRES_PASSWORD: judge0_password
+  #   volumes:
+  #     - judge0_db_data:/var/lib/postgresql/data
+
+  # judge0_redis:
+  #   image: redis:7-alpine
+  #   container_name: syncforge-judge0-redis
+  #   command: redis-server --appendonly no --requirepass judge0_password
+
+  # judge0_server:
+  #   image: judge0/judge0:1.13.1
+  #   container_name: syncforge-judge0
+  #   restart: unless-stopped
+  #   ports:
+  #     - "2358:2358"
+  #   environment:
+  #     - REDIS_HOST=judge0_redis
+  #     - REDIS_PASSWORD=judge0_password
+  #     - POSTGRES_HOST=judge0_db
+  #     - POSTGRES_DB=judge0
+  #     - POSTGRES_USER=judge0
+  #     - POSTGRES_PASSWORD=judge0_password
+  #     - AUTHN_HEADER=X-Auth-Token
+  #     - AUTHN_TOKEN=your-judge0-api-key
+  #   depends_on:
+  #     - judge0_db
+  #     - judge0_redis
+
+volumes:
+  postgres_data:
+  redis_data:
+  judge0_db_data:
+    name: syncforge-judge0-db-data
+
+networks:
+  default:
+    name: syncforge-network

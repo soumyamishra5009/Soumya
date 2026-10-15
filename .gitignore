@@ -1,0 +1,60 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Build outputs
+.next/
+out/
+build/
+dist/
+
+# Env
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+logs/
+
+# Python
+__pycache__/
+*.py[cod]
+venv/
+env/
+.venv/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+
+# Uploads & data
+uploads/*
+!uploads/.gitkeep
+media/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/*
+!.vscode/extensions.json
+.idea/
+
+# Turbo
+.turbo/
+
+# Test coverage
+coverage/
+
+# Model cache
+.cache/
+models/
+
+# Generated test fixture (recreate with apps/api/tests/make-sample-audio.ps1)
+apps/api/tests/sample-meeting.wav
