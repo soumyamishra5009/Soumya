@@ -69,11 +69,68 @@
 | Task | Model Tier | Example |
 |---|---|---|
 | Transcription | STT (local) | faster-whisper `small` / `int8` |
-| Summaries / extraction | Balanced | `llama-3.3:70b` |
-| Fast utilities | Light | `llama-3.1:8b` |
+| Summaries / extraction | Balanced | `llama3.1:8b` |
+| Fast utilities | Light | `llama3.1:8b` |
 | Code generation / agent | Code-specialized | `qwen2.5-coder:7b`, `deepseek-coder:6.7b` |
 
 `ENABLE_MODEL_ROUTING=true` lets the API pick the cheapest model that satisfies the task.
+
+## Graceful Degradation (Free-First)
+
+Every AI capability has an explicit ladder. The pipeline must never depend on a
+paid service or a machine you don't control.
+
+### Analysis ladder (`extract_meeting_intelligence`)
+
+1. **Ollama (local)** — primary, free, `OLLAMA_BASE_URL`.
+2. **OpenRouter** — cloud fallback if `OPENROUTER_API_KEY` is set.
+3. **Offline extractive fallback** — heuristic analysis with no LLM at all.
+
+If step 1/2 fails and `ALLOW_EXTRACTIVE_FALLBACK=true` (default), the extractor
+switches to `fallback_extract()` in `app/services/meeting_summary.py`:
+
+- sentence splitting → content-word frequency scoring for key points
+- cue-based classification for decisions / actions / risks / questions (English **and Hinglish**)
+- assignee inference from `"<Name> will/should/must …"` patterns
+- due-date parsing (`ISO`, `d/m/Y`, `by Friday`, `today`, `tomorrow`, `next week`)
+
+The result is **labelled** — `meeting.summary` is prefixed with a ⚠️ notice and
+the returned dict carries `source: "llm" | "fallback"` — so users are never
+misled about AI quality. Set `ALLOW_EXTRACTIVE_FALLBACK=false` to fail loudly
+instead (the meeting is marked `failed` with the reason surfaced).
+
+### Transcription ladder (`stt.transcribe_with_fallback`)
+
+1. `whisper_local` (faster-whisper, CPU `int8`) — 0 cost
+2. `groq_whisper` — only if `GROQ_API_KEY` is set
+3. meeting marked `failed` with the error surfaced in the UI
+
+### Known integration
+
+- **PyAV compatibility**: faster-whisper ≤ 1.1.x calls `av.open(..., metadata_errors="ignore")`,
+  which newer PyAV removed. `stt._install_av_compat()` wraps `av.open` to drop
+  rejected keywords instead of pinning an old PyAV (Python 3.14 has no wheel for it).
+- **Duration probing** (`app/services/audio.py`): WAV via stdlib `wave`, other
+  containers via PyAV metadata (no full decode), so the UI shows length before
+  transcription runs.
+
+## Environment Tiers
+
+| Concern | Dev (default) | Production |
+|---|---|---|
+| Database | `sqlite:///./syncforge.db` | Postgres + `pgvector` via `DATABASE_URL` |
+| Background jobs | FastAPI `BackgroundTasks` | Celery + Redis |
+| Storage | `./uploads` local disk | Supabase/S3-compatible |
+| LLM | Offline fallback or local Ollama | Ollama or OpenRouter |
+| STT | faster-whisper local | faster-whisper or Groq |
+
+## API Auth & Media
+
+- Phase 1 uses **JWT issued by FastAPI** (`bcrypt` + HS256), sent as `Authorization: Bearer`.
+- Workspace access is enforced by `require_workspace_member`-style guards on every endpoint.
+- `GET /api/v1/meetings/{id}/audio` accepts the token either as a bearer header **or**
+  `?token=…`, because HTML `<audio>` elements cannot set custom headers.
+  It returns 404 when no file is stored, 403 for non-members.
 
 ## Security & Privacy
 
