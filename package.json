@@ -10,7 +10,7 @@
     "packages/*"
   ],
   "scripts": {
-    "dev": "turbo run dev",
+    "dev": "powershell -ExecutionPolicy Bypass -File scripts/start-all.ps1",
     "dev:all": "powershell -ExecutionPolicy Bypass -File scripts/start-all.ps1",
     "dev:all:stop": "powershell -ExecutionPolicy Bypass -File scripts/start-all.ps1 -Stop",
     "build": "turbo run build",
