@@ -14,8 +14,9 @@ SyncForge AI bridges the gap between discussions and execution. Instead of meeti
 | **Editable AI Output** | Human-in-the-loop: edit the summary, key points, risks, questions and every decision inline — or add/delete decisions the AI missed. Nothing is locked. |
 | **Smart Action Tracker** | Auto-generated tasks linked to their source meeting. Kanban board with drag & drop, assignees (avatars), priorities, due dates, overdue alerts and filters (search, assignee, priority, due date, "My tasks"). |
 | **Team & Meetings History** | Add teammates by email (owner/admin), assign work to them, and keep a searchable meeting history with an archive. |
+| **AI Dev Studio** | Browser-based, workspace-scoped coding workspace: file explorer, Monaco Editor (bundled locally, no CDN), context-aware AI Chat (aware of the open file + file tree + a linked Meeting/Task) and an offline static analyzer. |
+| **Human-approved change proposals** | The AI *proposes* full-file edits as a side-by-side diff with a rationale. Nothing is written to disk until a teammate approves it — and stale proposals (file changed since) are refused. |
 | **Meeting-to-Code Agent** | Converts meeting decisions into technical requirements, breaks them into subtasks, identifies relevant files and proposes code changes as diffs with human approval. |
-| **AI Dev Studio** | Browser-based coding workspace with Monaco Editor, File Explorer, context-aware AI Chat (aware of Meeting + Task + Codebase) and diff viewer. |
 | **GitHub Integration** | Connect repositories and have AI propose changes via Pull Requests (write access never auto-granted, human approval is mandatory). |
 | **Sandbox Code Execution** | Isolated code execution via Judge0/E2B to safely run AI-generated code and tests. |
 | **Project Memory (RAG)** | Semantic search across meetings, documents and codebase using `pgvector`. Ask questions like *"Humne authentication ke liye kya decide kiya tha?"* with source references. |
@@ -62,11 +63,11 @@ Saumya/
 |---|---|---|
 | **Phase 1** | Day 1–2 | Scaffold + DB + Auth + Audio Upload + STT + AI Summary + Decisions/Action Items |
 | **Phase 2** | Day 3–4 | Kanban Board + Meeting→Task Linking + Editable AI Outputs + Meeting History + Team members/assignees |
-| **Phase 3** | Day 5–6 | AI Dev Studio (Monaco + File Explorer + Context-Aware AI Chat) |
+| **Phase 3** | Day 5–6 | AI Dev Studio (Monaco + File Explorer + Context-Aware AI Chat + human-approved change proposals) |
 | **Phase 4** | Day 7–8 | GitHub Integration + Meeting-to-Code Agent + Diffs + PR Proposals + Human Approval Flow |
 | **Phase 5** | Day 9–10 | Sandbox Testing + Project Memory (RAG) + Polish UI + Demo Prep |
 
-## ✅ Status — Phases 1 & 2 are built and running
+## ✅ Status — Phases 1, 2 & 3 are built and running
 
 | Area | State |
 |---|---|
@@ -82,10 +83,15 @@ Saumya/
 | **Team members** (add by email, roles, remove) + assignees/avatars | ✅ Working |
 | **Task filters** (search, assignee/My tasks, priority, due date) | ✅ Working |
 | **Meeting history + archive + search** | ✅ Working |
-| Dev Studio, meeting→code agent, GitHub PRs, sandbox | 🗺 Phase 3–4 |
+| **Dev Studio sandbox** (tree, read/write/create/delete, path-escape proof) | ✅ Working |
+| **Monaco editor** (local bundle, file tabs, save) + sample project | ✅ Working |
+| **Context-aware AI chat** (open file + file tree + linked meeting/task) | ✅ Working |
+| **Offline static analyzer** (lint, TODO scan, structure, no LLM needed) | ✅ Working |
+| **Change proposals** (diff review → approve writes / reject discards) | ✅ Working |
+| Meeting→code agent, GitHub PRs, sandbox test runs, RAG | 🗺 Phase 4–5 |
 
-**Test suites: 168 checks, all passing** — `smoke`, `normalize`, `fallback`, `pipeline`, `fallback_pipeline`, `team`.
-Live HTTP verification: `verify_live_stack.py` (11/11) and `verify_live_phase2.py` (16/16).
+**Test suites: 233 checks, all passing** — `smoke`, `normalize`, `fallback`, `pipeline`, `fallback_pipeline`, `team`, `studio`.
+Live HTTP verification: `verify_live_stack.py` (11/11), `verify_live_phase2.py` (16/16) and `verify_live_phase3.py` (21/21).
 
 ## 🚦 Quickstart
 
@@ -118,6 +124,14 @@ cd apps\web ; npx next dev
 
 Open <http://localhost:3000> → **Get Started** → create an account → upload a meeting.
 
+Then open **Dev Studio** in the sidebar → **Create sample project** to try the full loop:
+open `src/calculator.py`, ask the AI to *"fix the divide by zero bug"*, review the
+side-by-side diff, and press **Approve & write**. The AI never writes on its own.
+
+> Monaco is vendored into `apps/web/public/monaco` by `scripts/copy-monaco.mjs`
+> (run automatically by `start-web.ps1` and `npm run dev`/`build`), so the editor
+> works with no internet access and no CDN.
+
 ### 3. Run the tests
 
 ```powershell
@@ -130,6 +144,7 @@ Optional deeper checks:
 ```powershell
 .\venv\Scripts\python.exe tests\verify_live_stack.py              # live HTTP contract (Phase 1)
 .\venv\Scripts\python.exe tests\verify_live_phase2.py            # live HTTP contract (Phase 2: team/filters/edit)
+.\venv\Scripts\python.exe tests\verify_live_phase3.py            # live HTTP contract (Phase 3: studio files/chat/proposals)
 .\venv\Scripts\python.exe tests\test_stt_live.py                  # real Whisper run (downloads ~75 MB)
 .\venv\Scripts\python.exe tests\verify_live_e2e.py                # full live pipeline (needs API running)
 .\venv\Scripts\python.exe tests\make_sample_audio.ps1             # generate sample-meeting.wav via Windows TTS
@@ -163,6 +178,10 @@ WHISPER_MODEL=small                     # tiny | base | small | medium | large-v
 OLLAMA_BASE_URL=http://localhost:11434
 DEFAULT_SUMMARY_MODEL=llama3.1:8b
 ALLOW_EXTRACTIVE_FALLBACK=true
+
+# Dev Studio sandbox (per-workspace code trees live here; git-ignored)
+DEVSTUDIO_ROOT=./devstudio           # default; relative to apps/api
+DEVSTUDIO_MAX_FILE_KB=512            # per-file editor limit
 ```
 
 ## 🧠 Design Principles

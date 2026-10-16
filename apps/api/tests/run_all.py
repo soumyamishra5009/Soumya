@@ -16,6 +16,7 @@ TESTS = [
     "tests/test_pipeline.py",
     "tests/test_fallback_pipeline.py",
     "tests/test_team.py",
+    "tests/test_studio.py",
 ]
 
 try:

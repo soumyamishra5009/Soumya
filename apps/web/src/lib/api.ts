@@ -4,11 +4,18 @@
 // localStorage so the app stays stateless (no server session needed for MVP).
 
 import type {
+  CodeProposal,
   Decision,
+  LintResult,
   Member,
   Meeting,
   MeetingSummary,
   MeetingWithDetails,
+  ProposalDecision,
+  SeedResult,
+  StudioChatResponse,
+  StudioFile,
+  StudioTree,
   Task,
   TaskPriority,
   TaskStatus,
@@ -326,6 +333,123 @@ export const api = {
       body: JSON.stringify(patch),
     });
   },
+
+  // ---- dev studio ----
+  studioTree(workspaceId: string) {
+    return request<StudioTree>(`/api/v1/workspaces/${workspaceId}/studio/tree`);
+  },
+  studioSeed(workspaceId: string) {
+    return request<SeedResult>(`/api/v1/workspaces/${workspaceId}/studio/seed`, {
+      method: "POST",
+    });
+  },
+  studioFile(workspaceId: string, path: string) {
+    return request<StudioFile>(
+      `/api/v1/workspaces/${workspaceId}/studio/files/${encodeStudioPath(path)}`
+    );
+  },
+  studioSaveFile(workspaceId: string, path: string, content: string) {
+    return request<StudioFile>(
+      `/api/v1/workspaces/${workspaceId}/studio/files/${encodeStudioPath(path)}`,
+      { method: "PUT", body: JSON.stringify({ content }) }
+    );
+  },
+  studioCreateEntry(
+    workspaceId: string,
+    input: { path: string; kind: "file" | "dir"; content?: string }
+  ) {
+    return request<{ path: string; type: string }>(
+      `/api/v1/workspaces/${workspaceId}/studio/files`,
+      { method: "POST", body: JSON.stringify(input) }
+    );
+  },
+  studioDeleteEntry(workspaceId: string, path: string) {
+    return request<{ path: string; deleted: boolean }>(
+      `/api/v1/workspaces/${workspaceId}/studio/files/${encodeStudioPath(path)}`,
+      { method: "DELETE" }
+    );
+  },
+  studioLint(workspaceId: string, path: string, content: string) {
+    const qs = new URLSearchParams({ path }).toString();
+    return request<LintResult>(
+      `/api/v1/workspaces/${workspaceId}/studio/lint?${qs}`,
+      { method: "POST", body: JSON.stringify({ content }) }
+    );
+  },
+  studioChat(
+    workspaceId: string,
+    input: {
+      message: string;
+      file_path?: string | null;
+      meeting_id?: string | null;
+      task_id?: string | null;
+      history?: { role: "user" | "assistant"; content: string }[];
+    }
+  ) {
+    return request<StudioChatResponse>(
+      `/api/v1/workspaces/${workspaceId}/studio/chat`,
+      { method: "POST", body: JSON.stringify(input) }
+    );
+  },
+  studioProposals(workspaceId: string, status?: string) {
+    const qs = status ? `?status=${encodeURIComponent(status)}` : "";
+    return request<CodeProposal[]>(
+      `/api/v1/workspaces/${workspaceId}/studio/proposals${qs}`
+    );
+  },
+  studioCreateProposal(
+    workspaceId: string,
+    input: {
+      file_path: string;
+      instruction: string;
+      meeting_id?: string | null;
+      task_id?: string | null;
+    }
+  ) {
+    return request<CodeProposal>(
+      `/api/v1/workspaces/${workspaceId}/studio/proposals`,
+      { method: "POST", body: JSON.stringify(input) }
+    );
+  },
+  studioApproveProposal(workspaceId: string, proposalId: string) {
+    return request<ProposalDecision>(
+      `/api/v1/workspaces/${workspaceId}/studio/proposals/${proposalId}/approve`,
+      { method: "POST" }
+    );
+  },
+  studioRejectProposal(workspaceId: string, proposalId: string) {
+    return request<ProposalDecision>(
+      `/api/v1/workspaces/${workspaceId}/studio/proposals/${proposalId}/reject`,
+      { method: "POST" }
+    );
+  },
 };
 
-export type { Decision, Meeting, MeetingSummary, MeetingWithDetails, Member, Task, Transcript, User, Workspace };
+// Sandbox paths are POSIX-relative and may contain nested directories; encode
+// each segment so characters like "#" or "?" survive the round-trip.
+function encodeStudioPath(path: string): string {
+  return path
+    .split("/")
+    .filter(Boolean)
+    .map(encodeURIComponent)
+    .join("/");
+}
+
+export type {
+  CodeProposal,
+  Decision,
+  LintFinding,
+  LintResult,
+  Meeting,
+  MeetingSummary,
+  MeetingWithDetails,
+  Member,
+  StudioChatResponse,
+  StudioFile,
+  StudioFileNode,
+  StudioTree,
+  Task,
+  Transcript,
+  User,
+  Workspace,
+} from "./types";

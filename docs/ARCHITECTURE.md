@@ -33,14 +33,16 @@
 
 ## Core Pipeline: Meeting → Code
 
-1. **Upload** — User uploads audio/video to `/meetings/{id}/upload`.
-2. **Transcribe** — Celery job runs `faster-whisper`, produces timed segments + speaker labels.
-3. **Extract** — LLM (`instructor` + Pydantic schema) extracts summary, decisions, action items, risks, questions.
-4. **Track** — Action items become `Task` rows linked to the `Meeting` (traceability).
-5. **Plan** — Meeting-to-Code Agent converts a `Decision` into technical requirements + subtasks + affected files.
-6. **Change** — Agent proposes diffs (tool calling: read_file/edit_file/search_code) — never auto-commits.
-7. **Verify** — Sandbox runs generated tests; results attached to the run.
-8. **Approve** — Human approves; PR is opened on GitHub with the proposed changes.
+Status legend: **✅ live** · **🗺 planned (Phase 4–5)**
+
+1. **Upload** — User uploads audio/video to `/meetings/{id}/upload`. ✅
+2. **Transcribe** — `faster-whisper` produces timed segments + speaker labels. ✅
+3. **Extract** — LLM (`structured_completion` + Pydantic validation) extracts summary, decisions, action items, risks, questions. ✅
+4. **Track** — Action items become `Task` rows linked to the `Meeting` (traceability). ✅
+5. **Plan** — Meeting-to-Code Agent converts a `Decision` into technical requirements + subtasks + affected files. 🗺
+6. **Change** — The Dev Studio proposes full-file edits as `CodeProposal` rows (with rationale + a Monaco diff) — never auto-commits. ✅
+7. **Verify** — Sandbox runs generated tests; results attached to the run. 🗺 (the sample project ships a failing test to demonstrate this step)
+8. **Approve** — Human approves; the change is written, and (Phase 4) a PR is opened on GitHub. ✅ approval · 🗺 PR
 
 ## Agent Design (Tool Calling)
 
@@ -105,6 +107,17 @@ instead (the meeting is marked `failed` with the reason surfaced).
 2. `groq_whisper` — only if `GROQ_API_KEY` is set
 3. meeting marked `failed` with the error surfaced in the UI
 
+### Dev Studio ladder (`devstudio.ai_code_answer` / `ai_code_proposal`)
+
+1. **LLM** — Ollama first, then OpenRouter (`chat_completion` for Q&A,
+   `structured_completion` for proposals). Results are labelled `source="llm"`.
+2. **Offline deterministic fallback** — a code-aware analyser: structural overview
+   (imports/classes/functions), TODO/FIXME scan, a small static linter (bare
+   `except`, `== None`, mutable defaults, `eval`/`exec`, `==` in JS, long lines…),
+   and scaffolding proposals that only *append/prepend comments* or write a test
+   stub. Labelled `source="fallback"` and prefixed with a ⚠️ notice, so the UI is
+   always honest about what produced the text.
+
 ### Known integration
 
 - **PyAV compatibility**: faster-whisper ≤ 1.1.x calls `av.open(..., metadata_errors="ignore")`,
@@ -113,6 +126,11 @@ instead (the meeting is marked `failed` with the reason surfaced).
 - **Duration probing** (`app/services/audio.py`): WAV via stdlib `wave`, other
   containers via PyAV metadata (no full decode), so the UI shows length before
   transcription runs.
+- **Monaco is vendored, not CDN-loaded**: `@monaco-editor/react` defaults to fetching
+  Monaco from jsDelivr, which would break the Dev Studio offline. `apps/web/scripts/copy-monaco.mjs`
+  copies `monaco-editor/min/vs` into `apps/web/public/monaco/vs` (git-ignored) and the page
+  calls `loader.config({ paths: { vs: "/monaco/vs" } })`. The script is idempotent and runs
+  from `npm run dev`/`build` and `scripts/start-web.ps1`.
 
 ## Environment Tiers
 
@@ -123,6 +141,7 @@ instead (the meeting is marked `failed` with the reason surfaced).
 | Storage | `./uploads` local disk | Supabase/S3-compatible |
 | LLM | Offline fallback or local Ollama | Ollama or OpenRouter |
 | STT | faster-whisper local | faster-whisper or Groq |
+| Dev Studio files | `./devstudio/<workspace_id>/` on local disk | Mounted volume / object store |
 
 ### Dev-DB schema evolution
 
@@ -131,7 +150,7 @@ instead (the meeting is marked `failed` with the reason surfaced).
 additive `ALTER TABLE … ADD COLUMN` statements (e.g. `meetings.archived`). This keeps local
 SQLite zero-setup; **production uses Alembic** (`apps/api/alembic`).
 
-## API Surface (Phase 2)
+## API Surface — Phase 2
 
 | Method | Path | Purpose |
 |---|---|---|
@@ -147,6 +166,46 @@ Assignees are validated to be workspace members (`_assert_assignee`), and member
 requires the owner/admin role. Re-processing a meeting regenerates its AI-derived decisions
 and tasks (human edits to those rows are intentionally overwritten).
 
+## API Surface — Phase 3 (Dev Studio)
+
+Files live in a per-workspace disk sandbox (`DEVSTUDIO_ROOT/<workspace_id>/`); the database
+stores only change proposals (`code_proposals`) for audit.
+
+| Method | Path | Purpose |
+|---|---|---|
+| `GET` | `/api/v1/workspaces/{id}/studio/tree` | Nested file tree (dirs first), with size/language/editable per file |
+| `GET`/`PUT` | `/api/v1/workspaces/{id}/studio/files/{path}` | Read (404 if missing) / save a text file (creates parents) |
+| `POST` | `/api/v1/workspaces/{id}/studio/files` | Create a file (`kind=file`) or folder (`kind=dir`) |
+| `DELETE` | `/api/v1/workspaces/{id}/studio/files/{path}` | Delete a file, or a directory recursively |
+| `POST` | `/api/v1/workspaces/{id}/studio/seed` | Create the bundled sample project (skips existing files) |
+| `POST` | `/api/v1/workspaces/{id}/studio/lint` | Offline static analysis of an editor buffer (`?path=…`) |
+| `POST` | `/api/v1/workspaces/{id}/studio/chat` | Context-aware Q&A (`file_path`, `meeting_id`, `task_id`, `history`) |
+| `GET`/`POST` | `/api/v1/workspaces/{id}/studio/proposals` | List (filter by `status`) / create a change proposal |
+| `GET` | `/api/v1/workspaces/{id}/studio/proposals/{pid}` | Fetch one proposal (original ⇄ proposed + rationale) |
+| `POST` | `/api/v1/workspaces/{id}/studio/proposals/{pid}/approve` | **The only write path** — applies the proposed contents |
+| `POST` | `/api/v1/workspaces/{id}/studio/proposals/{pid}/reject` | Discard a proposal; the file is untouched |
+
+### Sandbox guarantees
+
+- Every path is normalised (`devstudio.normalize_rel`) — absolute paths, drive letters,
+  `~`, NUL bytes and any `..` segment are rejected, and the resolved target must be
+  `is_relative_to()` the workspace root. Traversal escapes return `400`.
+- Only text/code files are readable/writable (extension + filename allow-list); dotfiles
+  are denied except `.env.example`, `.gitignore`, `.dockerignore`, `.editorconfig`.
+- Per-file size cap (`DEVSTUDIO_MAX_FILE_KB`), tree depth (`DEVSTUDIO_MAX_DEPTH`) and file
+  count (`DEVSTUDIO_MAX_FILES`) caps keep listings bounded.
+- The sandbox root itself can never be deleted.
+
+### Human-in-the-loop change flow
+
+1. `POST …/proposals` asks the AI for a change. **Nothing is written.**
+2. The proposal stores `original_content`, `proposed_content`, `rationale`, `source`
+   (`llm`/`fallback`), a `base_hash` (sha256 of the original) and added/removed line counts.
+3. The UI shows a Monaco side-by-side diff; the reviewer approves or rejects.
+4. `…/approve` re-reads the file and refuses (`409`) if its hash no longer matches
+   `base_hash` — a stale proposal can never silently overwrite newer human work. Approved
+   proposals are written to disk; rejected ones leave the file byte-identical.
+
 ## API Auth & Media
 
 - Phase 1 uses **JWT issued by FastAPI** (`bcrypt` + HS256), sent as `Authorization: Bearer`.
@@ -159,5 +218,10 @@ and tasks (human edits to those rows are intentionally overwritten).
 
 - Participant consent flag enforced for recordings (`REQUIRE_CONSENT_FOR_RECORDINGS`).
 - Sandbox execution is isolated with CPU/memory/time limits.
+- **Dev Studio file access is confined to `DEVSTUDIO_ROOT/<workspace_id>/`** — path
+  traversal, absolute paths and non-text extensions are rejected, and the sandbox root is
+  never deletable.
+- **No AI-authored code reaches disk without explicit human approval**, and approved
+  proposals are hash-checked so they cannot clobber newer edits.
 - Secrets (tokens, keys) are never sent to the LLM.
 - Rate limiting and audit logs on all mutating endpoints.

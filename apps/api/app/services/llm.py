@@ -154,6 +154,26 @@ def structured_completion(
     return _extract_json(raw)
 
 
+def chat_completion(
+    system: str,
+    user: str,
+    model: str | None = None,
+    temperature: float = 0.3,
+    max_tokens: int = 4096,
+) -> str:
+    """Free-form text completion (used by the Dev Studio assistant).
+
+    Same provider ladder as :func:`structured_completion` (Ollama first, then
+    OpenRouter) but returns the raw answer instead of parsing JSON.
+    """
+    model = model or os.getenv("DEFAULT_CHAT_MODEL", "llama-3.1:8b")
+    messages = [
+        {"role": "system", "content": system},
+        {"role": "user", "content": user},
+    ]
+    return _chat_completion(model, messages, temperature=temperature, max_tokens=max_tokens)
+
+
 def embed(texts: list[str]) -> list[list[float]]:
     """Embed texts using Ollama's embeddings endpoint."""
     base = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434").rstrip("/")

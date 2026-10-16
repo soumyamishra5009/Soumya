@@ -27,7 +27,7 @@ const NAV = [
   { href: "/dashboard/meetings", label: "Meetings", icon: AudioLines, ready: true },
   { href: "/dashboard/tasks", label: "Task Board", icon: KanbanSquare, ready: true },
   { href: "/dashboard/team", label: "Team", icon: Users, ready: true },
-  { href: "/dashboard/studio", label: "Dev Studio", icon: Code2, ready: false },
+  { href: "/dashboard/studio", label: "Dev Studio", icon: Code2, ready: true },
 ];
 
 function Shell({ children }: { children: ReactNode }) {

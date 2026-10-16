@@ -153,3 +153,100 @@ export interface Task {
   created_at: string;
   updated_at: string;
 }
+
+// ---------------------------------------------------------------------------
+// Dev Studio (Phase 3)
+// ---------------------------------------------------------------------------
+
+export interface StudioFileNode {
+  name: string;
+  path: string;
+  type: "file" | "dir";
+  size?: number | null;
+  language?: string | null;
+  editable?: boolean | null;
+  children?: StudioFileNode[] | null;
+}
+
+export interface StudioTree {
+  name: string;
+  path: string;
+  type: "file" | "dir";
+  children: StudioFileNode[];
+  empty: boolean;
+  count: number;
+  truncated: boolean;
+}
+
+export interface StudioFile {
+  path: string;
+  name: string;
+  language: string;
+  content: string;
+  size: number;
+  editable: boolean;
+  hash: string;
+  updated_at: string | null;
+}
+
+export type ProposalStatus = "pending" | "approved" | "rejected";
+
+export interface CodeProposal {
+  id: string;
+  workspace_id: string;
+  file_path: string;
+  language: string | null;
+  original_content: string | null;
+  proposed_content: string;
+  rationale: string | null;
+  source: string; // "llm" | "fallback"
+  status: ProposalStatus;
+  base_hash: string | null;
+  added_lines: number;
+  removed_lines: number;
+  meeting_id: string | null;
+  task_id: string | null;
+  created_by: string | null;
+  decided_by: string | null;
+  created_at: string;
+  decided_at: string | null;
+}
+
+export interface ProposalDecision {
+  proposal: CodeProposal;
+  applied: boolean;
+  message: string;
+}
+
+export interface ChatSuggestion {
+  action: string;
+  label: string;
+  file_path: string | null;
+  instruction: string | null;
+}
+
+export interface StudioChatResponse {
+  answer: string;
+  source: string; // "llm" | "fallback"
+  suggestions: ChatSuggestion[];
+  context_used: Record<string, unknown>;
+  fallback_reason: string | null;
+}
+
+export interface LintFinding {
+  line: number;
+  severity: string;
+  message: string;
+  snippet: string;
+}
+
+export interface LintResult {
+  path: string;
+  language: string;
+  findings: LintFinding[];
+}
+
+export interface SeedResult {
+  created: string[];
+  skipped: number;
+}

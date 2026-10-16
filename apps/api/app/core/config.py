@@ -64,6 +64,16 @@ class Settings(BaseSettings):
     STORAGE_TYPE: str = "local"
     UPLOAD_DIR: str = "./uploads"
     MAX_UPLOAD_SIZE_MB: int = 100
+
+    # Dev Studio (Phase 3) — sandboxed, per-workspace code tree on disk.
+    # Files live under DEVSTUDIO_ROOT/<workspace_id>/ so later phases (test
+    # runs, git) can operate on real files without touching the host project.
+    DEVSTUDIO_ROOT: str = "./devstudio"
+    DEVSTUDIO_MAX_FILE_KB: int = 512
+    DEVSTUDIO_MAX_FILES: int = 2000
+    DEVSTUDIO_MAX_DEPTH: int = 8
+    # How many characters of a file to include as context for the AI chat.
+    DEVSTUDIO_CONTEXT_CHARS: int = 12000
     
     # Code Execution
     CODE_EXECUTOR: str = "judge0"

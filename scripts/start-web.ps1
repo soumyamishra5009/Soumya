@@ -33,6 +33,13 @@ if ($Clean) {
     }
 }
 
+# Vendor Monaco into public/ so the Dev Studio editor never needs a CDN
+# (idempotent: skips when the copied version already matches).
+$copyScript = Join-Path $webDir "scripts\copy-monaco.mjs"
+if (Test-Path $copyScript) {
+    & node $copyScript
+}
+
 Write-Host "Starting SyncForge web on http://localhost:$port ..."
 Start-Process -WindowStyle Hidden -FilePath "cmd.exe" `
     -ArgumentList "/c", "cd /d `"$webDir`" && npx next dev --port $port > `"$logFile`" 2>&1"

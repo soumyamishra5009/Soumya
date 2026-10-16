@@ -3,8 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
+    "dev": "node scripts/copy-monaco.mjs && next dev",
+    "build": "node scripts/copy-monaco.mjs && next build",
     "start": "next start",
     "lint": "next lint",
     "lint:fix": "next lint --fix",
@@ -53,6 +53,7 @@
     "@types/react-dom": "^19.0.1",
     "eslint": "^8.57.1",
     "eslint-config-next": "15.1.0",
+    "monaco-editor": "^0.52.2",
     "postcss": "^8.4.49",
     "tailwindcss": "^3.4.16",
     "typescript": "^5.7.2"
