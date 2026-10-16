@@ -38,6 +38,15 @@ class Workspace(Base):
     code_proposals = relationship(
         "CodeProposal", back_populates="workspace", cascade="all, delete-orphan"
     )
+    repo_connections = relationship(
+        "RepoConnection", back_populates="workspace", cascade="all, delete-orphan"
+    )
+    code_plans = relationship(
+        "CodePlan", back_populates="workspace", cascade="all, delete-orphan"
+    )
+    pull_requests = relationship(
+        "PullRequestProposal", back_populates="workspace", cascade="all, delete-orphan"
+    )
 
     def __repr__(self) -> str:
         return f"<Workspace {self.slug}>"

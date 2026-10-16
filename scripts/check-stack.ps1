@@ -20,7 +20,7 @@ foreach ($p in @("/docs", "/openapi.json")) {
 }
 
 Write-Host "`n=== WEB (http://localhost:3000) ==="
-foreach ($p in @("/", "/login", "/dashboard", "/dashboard/meetings", "/dashboard/tasks", "/dashboard/team", "/dashboard/studio")) {
+foreach ($p in @("/", "/login", "/dashboard", "/dashboard/meetings", "/dashboard/tasks", "/dashboard/team", "/dashboard/studio", "/dashboard/agent")) {
     try {
         $r = Invoke-WebRequest -Uri ("http://localhost:3000" + $p) -UseBasicParsing -TimeoutSec 90
         Write-Host ("{0,-22}-> HTTP {1}" -f $p, $r.StatusCode)

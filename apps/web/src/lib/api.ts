@@ -4,14 +4,23 @@
 // localStorage so the app stays stateless (no server session needed for MVP).
 
 import type {
+  CodePlan,
   CodeProposal,
   Decision,
+  GitCommit,
+  GitDiff,
+  GitStatus,
   LintResult,
   Member,
   Meeting,
   MeetingSummary,
   MeetingWithDetails,
+  PlanApply,
   ProposalDecision,
+  PullRequest,
+  PullRequestDecision,
+  RepoCheck,
+  RepoConnection,
   SeedResult,
   StudioChatResponse,
   StudioFile,
@@ -423,6 +432,121 @@ export const api = {
       { method: "POST" }
     );
   },
+
+  // ---- ship: repositories ----
+  listRepos(workspaceId: string) {
+    return request<RepoConnection[]>(`/api/v1/workspaces/${workspaceId}/repos`);
+  },
+  connectRepo(
+    workspaceId: string,
+    input: {
+      provider: "local" | "github";
+      name?: string | null;
+      repo_full_name?: string | null;
+      default_branch?: string;
+    }
+  ) {
+    return request<RepoConnection>(`/api/v1/workspaces/${workspaceId}/repos`, {
+      method: "POST",
+      body: JSON.stringify(input),
+    });
+  },
+  deleteRepo(workspaceId: string, repoId: string) {
+    return request<void>(`/api/v1/workspaces/${workspaceId}/repos/${repoId}`, {
+      method: "DELETE",
+    });
+  },
+  checkRepo(workspaceId: string, repoId: string) {
+    return request<RepoCheck>(
+      `/api/v1/workspaces/${workspaceId}/repos/${repoId}/check`,
+      { method: "POST" }
+    );
+  },
+
+  // ---- ship: local git ----
+  gitStatus(workspaceId: string) {
+    return request<GitStatus>(`/api/v1/workspaces/${workspaceId}/git/status`);
+  },
+  gitDiff(workspaceId: string) {
+    return request<GitDiff>(`/api/v1/workspaces/${workspaceId}/git/diff`);
+  },
+  gitLog(workspaceId: string, limit = 20) {
+    return request<GitCommit[]>(
+      `/api/v1/workspaces/${workspaceId}/git/log?limit=${limit}`
+    );
+  },
+
+  // ---- ship: pull-request proposals ----
+  listPullRequests(workspaceId: string, status?: string) {
+    const qs = status ? `?status=${encodeURIComponent(status)}` : "";
+    return request<PullRequest[]>(
+      `/api/v1/workspaces/${workspaceId}/pull-requests${qs}`
+    );
+  },
+  createPullRequest(
+    workspaceId: string,
+    input: {
+      title: string;
+      body?: string | null;
+      provider?: "local" | "github" | null;
+      repo_id?: string | null;
+      base_branch?: string | null;
+      meeting_id?: string | null;
+      task_id?: string | null;
+      proposal_ids?: string[];
+    }
+  ) {
+    return request<PullRequest>(`/api/v1/workspaces/${workspaceId}/pull-requests`, {
+      method: "POST",
+      body: JSON.stringify(input),
+    });
+  },
+  openPullRequest(workspaceId: string, prId: string) {
+    return request<PullRequestDecision>(
+      `/api/v1/workspaces/${workspaceId}/pull-requests/${prId}/open`,
+      { method: "POST" }
+    );
+  },
+  mergePullRequest(workspaceId: string, prId: string) {
+    return request<PullRequestDecision>(
+      `/api/v1/workspaces/${workspaceId}/pull-requests/${prId}/merge`,
+      { method: "POST" }
+    );
+  },
+  closePullRequest(workspaceId: string, prId: string) {
+    return request<PullRequestDecision>(
+      `/api/v1/workspaces/${workspaceId}/pull-requests/${prId}/close`,
+      { method: "POST" }
+    );
+  },
+
+  // ---- agent: meeting -> code ----
+  agentPlan(
+    workspaceId: string,
+    input: {
+      meeting_id?: string | null;
+      decision_id?: string | null;
+      task_id?: string | null;
+      focus?: string | null;
+    }
+  ) {
+    return request<CodePlan>(`/api/v1/workspaces/${workspaceId}/agent/plan`, {
+      method: "POST",
+      body: JSON.stringify(input),
+    });
+  },
+  listPlans(workspaceId: string) {
+    return request<CodePlan[]>(`/api/v1/workspaces/${workspaceId}/agent/plans`);
+  },
+  getPlan(workspaceId: string, planId: string) {
+    return request<CodePlan>(`/api/v1/workspaces/${workspaceId}/agent/plans/${planId}`);
+  },
+  applyPlan(workspaceId: string, planId: string) {
+    return request<PlanApply>(
+      `/api/v1/workspaces/${workspaceId}/agent/plans/${planId}/apply`,
+      { method: "POST" }
+    );
+  },
 };
 
 // Sandbox paths are POSIX-relative and may contain nested directories; encode
@@ -436,14 +560,28 @@ function encodeStudioPath(path: string): string {
 }
 
 export type {
+  CodePlan,
   CodeProposal,
   Decision,
+  GitChangedFile,
+  GitCommit,
+  GitDiff,
+  GitStatus,
   LintFinding,
   LintResult,
   Meeting,
   MeetingSummary,
   MeetingWithDetails,
   Member,
+  PlanApply,
+  PlanChange,
+  PlanFile,
+  PlanSubtask,
+  PullRequest,
+  PullRequestDecision,
+  PullRequestFile,
+  RepoCheck,
+  RepoConnection,
   StudioChatResponse,
   StudioFile,
   StudioFileNode,

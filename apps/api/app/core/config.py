@@ -91,6 +91,12 @@ class Settings(BaseSettings):
     GITHUB_CLIENT_ID: str = ""
     GITHUB_CLIENT_SECRET: str = ""
     GITHUB_TOKEN: str = ""
+    GITHUB_API_URL: str = "https://api.github.com"
+
+    # Meeting→Code agent (Phase 4). How many files to surface as "affected" and
+    # how much file content to feed the planner.
+    AGENT_MAX_FILES: int = 8
+    AGENT_CONTEXT_CHARS: int = 20000
     
     # Celery
     CELERY_BROKER_URL: str = "redis://localhost:6379/0"

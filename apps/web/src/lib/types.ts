@@ -250,3 +250,150 @@ export interface SeedResult {
   created: string[];
   skipped: number;
 }
+
+// ---------------------------------------------------------------------------
+// Ship it (Phase 4): repositories, git, pull-request proposals, the agent
+// ---------------------------------------------------------------------------
+
+export type RepoProvider = "local" | "github";
+
+export type PullRequestStatus = "draft" | "open" | "merged" | "closed" | "failed";
+
+export type PlanStatus = "draft" | "applied";
+
+export interface RepoConnection {
+  id: string;
+  workspace_id: string;
+  provider: RepoProvider;
+  name: string;
+  repo_full_name: string | null;
+  default_branch: string;
+  is_active: boolean;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface RepoCheck {
+  repo_id: string;
+  provider: RepoProvider;
+  ok: boolean;
+  message: string;
+  detail: Record<string, unknown>;
+}
+
+export interface GitChangedFile {
+  path: string;
+  status: string;
+}
+
+export interface GitStatus {
+  available: boolean;
+  initialized: boolean;
+  branch: string | null;
+  branches: string[];
+  clean: boolean;
+  changed_files: GitChangedFile[];
+  commit_count: number;
+}
+
+export interface GitCommit {
+  sha: string;
+  author_name: string;
+  author_email: string;
+  date: string;
+  message: string;
+}
+
+export interface GitDiff {
+  branch: string | null;
+  diff: string;
+  changed_files: GitChangedFile[];
+  truncated: boolean;
+}
+
+export interface PullRequestFile {
+  path: string;
+  status: string;
+  deleted: boolean;
+  added_lines: number;
+  removed_lines: number;
+}
+
+export interface PullRequest {
+  id: string;
+  workspace_id: string;
+  repo_id: string | null;
+  provider: RepoProvider;
+  title: string;
+  body: string | null;
+  branch_name: string;
+  base_branch: string;
+  status: PullRequestStatus;
+  changed_files: PullRequestFile[];
+  skipped_files: string[];
+  diff: string | null;
+  file_count: number;
+  added_lines: number;
+  removed_lines: number;
+  commit_sha: string | null;
+  external_number: number | null;
+  external_url: string | null;
+  error: string | null;
+  meeting_id: string | null;
+  task_id: string | null;
+  created_by: string | null;
+  decided_by: string | null;
+  created_at: string;
+  decided_at: string | null;
+}
+
+export interface PullRequestDecision {
+  proposal: PullRequest;
+  message: string;
+}
+
+export interface PlanSubtask {
+  title: string;
+  kind: string; // "code" | "test" | "docs" | "review"
+  files: string[];
+}
+
+export interface PlanFile {
+  path: string;
+  reason: string;
+  score: number;
+}
+
+export interface PlanChange {
+  path: string;
+  instruction: string;
+}
+
+export interface CodePlan {
+  id: string;
+  workspace_id: string;
+  title: string;
+  summary: string | null;
+  focus: string | null;
+  meeting_id: string | null;
+  decision_id: string | null;
+  task_id: string | null;
+  requirements: string[];
+  subtasks: PlanSubtask[];
+  affected_files: PlanFile[];
+  proposed_changes: PlanChange[];
+  source: string; // "llm" | "fallback"
+  status: PlanStatus;
+  proposal_ids: string[];
+  created_by: string | null;
+  created_at: string;
+}
+
+export interface PlanApply {
+  plan: CodePlan;
+  created: number;
+  proposal_ids: string[];
+  skipped: string[];
+  message: string;
+}

@@ -6,7 +6,7 @@
                     ┌─────────────────────────────────────────┐
                     │            apps/web (Next.js)            │
                     │  Dashboard · Meeting Room · Kanban       │
-                    │  Dev Studio (Monaco) · Memory Search     │
+                    │  Dev Studio (Monaco) · Meeting → Code    │
                     └───────────────────┬─────────────────────┘
                                         │ REST / SSE
                                         ▼
@@ -33,27 +33,66 @@
 
 ## Core Pipeline: Meeting → Code
 
-Status legend: **✅ live** · **🗺 planned (Phase 4–5)**
+Status legend: **✅ live** · **🗺 planned (Phase 5)**
 
 1. **Upload** — User uploads audio/video to `/meetings/{id}/upload`. ✅
 2. **Transcribe** — `faster-whisper` produces timed segments + speaker labels. ✅
 3. **Extract** — LLM (`structured_completion` + Pydantic validation) extracts summary, decisions, action items, risks, questions. ✅
 4. **Track** — Action items become `Task` rows linked to the `Meeting` (traceability). ✅
-5. **Plan** — Meeting-to-Code Agent converts a `Decision` into technical requirements + subtasks + affected files. 🗺
+5. **Plan** — Meeting-to-Code Agent converts a `Decision` into technical requirements + subtasks + affected files, then into `CodeProposal`s. ✅
 6. **Change** — The Dev Studio proposes full-file edits as `CodeProposal` rows (with rationale + a Monaco diff) — never auto-commits. ✅
 7. **Verify** — Sandbox runs generated tests; results attached to the run. 🗺 (the sample project ships a failing test to demonstrate this step)
-8. **Approve** — Human approves; the change is written, and (Phase 4) a PR is opened on GitHub. ✅ approval · 🗺 PR
+8. **Ship** — Human approves; the change is written, then a real branch/commit is created and a PR is opened (local git or GitHub). ✅
 
-## Agent Design (Tool Calling)
+## Meeting → Code Agent (Phase 4)
 
-| Tool | Purpose |
+`app/services/agent.py` turns a meeting into an engineering plan. Inputs: the
+meeting's summary/key-points/next-steps, its `Decision` rows and its linked
+`Task` rows, plus the sandbox file tree. Output (`CodePlan`):
+
+| Field | Meaning |
 |---|---|
-| `list_files` / `read_file` | Understand the repo |
-| `search_code` | Find relevant symbols |
-| `edit_file` / `write_file` | Propose changes (produce diffs, not writes) |
-| `run_tests` / `run_command` | Sandboxed verification |
-| `create_task` | Create follow-up work items |
-| `create_pr` | Open pull request (requires approval) |
+| `requirements` | What the meeting actually asked for (decisions first) |
+| `subtasks` | Concrete steps, each tagged `code` / `test` / `docs` / `review` |
+| `affected_files` | Ranked files + a human-readable `reason` |
+| `proposed_changes` | `{path, instruction}` pairs → become `CodeProposal`s |
+
+The offline planner tokenizes the meeting text (camelCase/`snake_case` aware,
+English + Hinglish stop-words) and scores every sandbox file by keyword overlap
+with its path and contents. *Applying* a plan only creates **pending**
+proposals — the agent never writes to disk.
+
+## Shipping — Local Git & Pull Requests (Phase 4)
+
+`app/services/localgit.py` is the offline-first provider: `ensure_repo()` turns a
+workspace sandbox into a real git repository with a baseline commit (created
+lazily on first use), and approved edits then appear as ordinary working-tree
+changes. A `PullRequestProposal` is a **snapshot** of that change set
+(`files` + `diff` + line counts) captured when a human creates it; the local
+provider refuses to open if the sandbox has drifted since (`snapshot_matches`),
+mirroring the Dev Studio `base_hash` guard.
+
+`app/services/ship.py` dispatches to one of two providers behind one interface:
+
+| Provider | Open | Merge | Close |
+|---|---|---|---|
+| `local` | branch + commit in the sandbox | `git merge --no-ff` into base | checkout base + delete branch |
+| `github` | blobs → tree → commit → ref, then `POST /pulls` | `PUT /pulls/{n}/merge` | `PATCH /pulls/{n}` |
+
+The GitHub token is read from the environment **at call time** and is never
+stored in the database. Without a token every remote call fails with a clear
+message and the local provider keeps working.
+
+### Agent Design (Tool Calling)
+
+| Tool | Purpose | Status |
+|---|---|---|
+| `list_files` / `read_file` | Understand the repo | ✅ `devstudio.list_tree` / `read_file` |
+| `search_code` | Find relevant symbols | ✅ keyword scoring in `agent.score_files` |
+| `edit_file` / `write_file` | Propose changes (produce diffs, not writes) | ✅ `CodeProposal` |
+| `create_task` | Create follow-up work items | ✅ tasks already linked to meetings |
+| `create_pr` | Open pull request (requires approval) | ✅ `PullRequestProposal` → `…/open` |
+| `run_tests` / `run_command` | Sandboxed verification | 🗺 Phase 5 |
 
 **Rules:**
 - Agent output is always a *proposal* until a human approves.
@@ -118,6 +157,20 @@ instead (the meeting is marked `failed` with the reason surfaced).
    stub. Labelled `source="fallback"` and prefixed with a ⚠️ notice, so the UI is
    always honest about what produced the text.
 
+### Meeting → Code ladder (`agent.ai_code_plan`)
+
+The same three rungs as everything else:
+
+1. **LLM** — `structured_completion` with `AGENT_MODEL` (Ollama → OpenRouter).
+   The model may only reference files that exist in the tree; hallucinated paths
+   are dropped in `_coerce_plan` before the plan is stored.
+2. **Offline deterministic planner** — keyword scoring against the file tree (no
+   LLM, no network). Labelled `source="fallback"` with the reason attached.
+
+Proposals created from a plan reuse the Dev Studio ladder via
+`app/services/proposals.py` (a single shared builder), so both entry points apply
+identical path-safety, size and hashing rules.
+
 ### Known integration
 
 - **PyAV compatibility**: faster-whisper ≤ 1.1.x calls `av.open(..., metadata_errors="ignore")`,
@@ -142,6 +195,7 @@ instead (the meeting is marked `failed` with the reason surfaced).
 | LLM | Offline fallback or local Ollama | Ollama or OpenRouter |
 | STT | faster-whisper local | faster-whisper or Groq |
 | Dev Studio files | `./devstudio/<workspace_id>/` on local disk | Mounted volume / object store |
+| Ship provider | `local` git repo in the sandbox (offline) | `github` via REST + `GITHUB_TOKEN` |
 
 ### Dev-DB schema evolution
 
@@ -194,6 +248,8 @@ stores only change proposals (`code_proposals`) for audit.
   are denied except `.env.example`, `.gitignore`, `.dockerignore`, `.editorconfig`.
 - Per-file size cap (`DEVSTUDIO_MAX_FILE_KB`), tree depth (`DEVSTUDIO_MAX_DEPTH`) and file
   count (`DEVSTUDIO_MAX_FILES`) caps keep listings bounded.
+- The `.git` directory is managed only by the app: any path containing a `.git` segment is
+  rejected by `normalize_rel`.
 - The sandbox root itself can never be deleted.
 
 ### Human-in-the-loop change flow
@@ -205,6 +261,34 @@ stores only change proposals (`code_proposals`) for audit.
 4. `…/approve` re-reads the file and refuses (`409`) if its hash no longer matches
    `base_hash` — a stale proposal can never silently overwrite newer human work. Approved
    proposals are written to disk; rejected ones leave the file byte-identical.
+
+## API Surface — Phase 4 (Ship it)
+
+Repositories and pull-request proposals are rows in the database; the *code*
+stays in the sandbox (local provider) or on GitHub (remote provider). Tokens are
+never persisted.
+
+| Method | Path | Purpose |
+|---|---|---|
+| `GET`/`POST` | `/api/v1/workspaces/{id}/repos` | List / connect a repository (`local` or `github`; admin only) |
+| `GET`/`DELETE` | `/api/v1/workspaces/{id}/repos/{rid}` | Fetch / disconnect a connection |
+| `POST` | `/api/v1/workspaces/{id}/repos/{rid}/check` | Probe the connection (git state, or the remote repo) |
+| `GET` | `/api/v1/workspaces/{id}/git/status` | Branch, branches, changed files, commit count (creates the repo on first call) |
+| `GET` | `/api/v1/workspaces/{id}/git/diff` | Unified diff of the working tree (untracked files included) |
+| `GET` | `/api/v1/workspaces/{id}/git/log` | Recent commits |
+| `GET`/`POST` | `/api/v1/workspaces/{id}/pull-requests` | List (filter by `status`) / snapshot the current changes as a **draft** |
+| `GET` | `/api/v1/workspaces/{id}/pull-requests/{pid}` | Fetch one proposal (files + diff) |
+| `POST` | `/api/v1/workspaces/{id}/pull-requests/{pid}/open` | **Approval** — create the real branch/commit (and PR when remote) |
+| `POST` | `/api/v1/workspaces/{id}/pull-requests/{pid}/merge` | Merge an open proposal |
+| `POST` | `/api/v1/workspaces/{id}/pull-requests/{pid}/close` | Close a draft/open proposal |
+| `POST` | `/api/v1/workspaces/{id}/agent/plan` | Build a plan from a meeting / decision / focus |
+| `GET` | `/api/v1/workspaces/{id}/agent/plans` | List plans |
+| `GET` | `/api/v1/workspaces/{id}/agent/plans/{plan_id}` | Fetch one plan |
+| `POST` | `/api/v1/workspaces/{id}/agent/plans/{plan_id}/apply` | Turn a plan into **pending** `CodeProposal`s |
+
+Referencing a not-yet-approved proposal when creating a PR returns `409`; opening
+a proposal whose sandbox drifted returns `502` and the proposal is persisted as
+`failed` with the reason.
 
 ## API Auth & Media
 
@@ -223,5 +307,11 @@ stores only change proposals (`code_proposals`) for audit.
   never deletable.
 - **No AI-authored code reaches disk without explicit human approval**, and approved
   proposals are hash-checked so they cannot clobber newer edits.
+- **Git operations never touch the network** for the `local` provider: `git` runs with
+  `--no-pager`, `GIT_TERMINAL_PROMPT=0`, `GIT_CONFIG_NOSYSTEM=1` and list-form arguments
+  (no shell), inside `DEVSTUDIO_ROOT/<workspace_id>`. Branch names are validated and the
+  `.git` directory is unreachable through the file API.
+- **GitHub tokens are read from the environment at call time** and are never written to the
+  database, so a database leak cannot leak a credential.
 - Secrets (tokens, keys) are never sent to the LLM.
 - Rate limiting and audit logs on all mutating endpoints.

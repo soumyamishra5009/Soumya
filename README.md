@@ -67,7 +67,7 @@ Saumya/
 | **Phase 4** | Day 7–8 | GitHub Integration + Meeting-to-Code Agent + Diffs + PR Proposals + Human Approval Flow |
 | **Phase 5** | Day 9–10 | Sandbox Testing + Project Memory (RAG) + Polish UI + Demo Prep |
 
-## ✅ Status — Phases 1, 2 & 3 are built and running
+## ✅ Status — Phases 1, 2, 3 & 4 are built and running
 
 | Area | State |
 |---|---|
@@ -88,10 +88,16 @@ Saumya/
 | **Context-aware AI chat** (open file + file tree + linked meeting/task) | ✅ Working |
 | **Offline static analyzer** (lint, TODO scan, structure, no LLM needed) | ✅ Working |
 | **Change proposals** (diff review → approve writes / reject discards) | ✅ Working |
-| Meeting→code agent, GitHub PRs, sandbox test runs, RAG | 🗺 Phase 4–5 |
+| **Meeting→Code agent** (decisions → requirements, subtasks, affected files) | ✅ Working |
+| **Plan → proposals** (apply a plan into pending, reviewable changes) | ✅ Working |
+| **Local git provider** (init, status, diff, log, branch, commit, merge) | ✅ Working |
+| **Repository connections** (offline local sandbox + GitHub metadata) | ✅ Working |
+| **Pull-request proposals** (draft snapshot → open commit → merge / close) | ✅ Working |
+| **GitHub push** (blobs → tree → commit → pull request via REST) | ✅ Gated on `GITHUB_TOKEN` |
+| Sandbox test runs, Project Memory (RAG) | 🗺 Phase 5 |
 
-**Test suites: 233 checks, all passing** — `smoke`, `normalize`, `fallback`, `pipeline`, `fallback_pipeline`, `team`, `studio`.
-Live HTTP verification: `verify_live_stack.py` (11/11), `verify_live_phase2.py` (16/16) and `verify_live_phase3.py` (21/21).
+**Test suites: 303 checks, all passing** — `smoke`, `normalize`, `fallback`, `pipeline`, `fallback_pipeline`, `team`, `studio`, `ship`.
+Live HTTP verification: `verify_live_stack.py` (11/11), `verify_live_phase2.py` (16/16), `verify_live_phase3.py` (21/21) and `verify_live_phase4.py` (26/26).
 
 ## 🚦 Quickstart
 
@@ -128,6 +134,16 @@ Then open **Dev Studio** in the sidebar → **Create sample project** to try the
 open `src/calculator.py`, ask the AI to *"fix the divide by zero bug"*, review the
 side-by-side diff, and press **Approve & write**. The AI never writes on its own.
 
+To see the whole pipeline, open **Meeting → Code**:
+
+1. Pick a meeting (its decisions drive the plan) and press **Generate plan**.
+2. Press **Create change proposals**, then approve them inline (or in Dev Studio).
+3. In **Ship it**, connect the **local sandbox** repository, press **Create draft**,
+   then **Open** → **Merge**. That is a real git branch, commit and merge in the
+   sandbox — entirely offline, no account required.
+4. Connect a GitHub `owner/repo` instead to push the same reviewed snapshot as a
+   real pull request (set `GITHUB_TOKEN` to enable it).
+
 > Monaco is vendored into `apps/web/public/monaco` by `scripts/copy-monaco.mjs`
 > (run automatically by `start-web.ps1` and `npm run dev`/`build`), so the editor
 > works with no internet access and no CDN.
@@ -145,6 +161,7 @@ Optional deeper checks:
 .\venv\Scripts\python.exe tests\verify_live_stack.py              # live HTTP contract (Phase 1)
 .\venv\Scripts\python.exe tests\verify_live_phase2.py            # live HTTP contract (Phase 2: team/filters/edit)
 .\venv\Scripts\python.exe tests\verify_live_phase3.py            # live HTTP contract (Phase 3: studio files/chat/proposals)
+.\venv\Scripts\python.exe tests\verify_live_phase4.py            # live HTTP contract (Phase 4: git, PR proposals, agent)
 .\venv\Scripts\python.exe tests\test_stt_live.py                  # real Whisper run (downloads ~75 MB)
 .\venv\Scripts\python.exe tests\verify_live_e2e.py                # full live pipeline (needs API running)
 .\venv\Scripts\python.exe tests\make_sample_audio.ps1             # generate sample-meeting.wav via Windows TTS
@@ -182,6 +199,11 @@ ALLOW_EXTRACTIVE_FALLBACK=true
 # Dev Studio sandbox (per-workspace code trees live here; git-ignored)
 DEVSTUDIO_ROOT=./devstudio           # default; relative to apps/api
 DEVSTUDIO_MAX_FILE_KB=512            # per-file editor limit
+
+# Ship it (Phase 4)
+GITHUB_TOKEN=                        # optional: enables real GitHub pull requests
+AGENT_MAX_FILES=8                    # files the Meeting→Code agent may surface
+AGENT_CONTEXT_CHARS=20000            # file content fed to the planner
 ```
 
 ## 🧠 Design Principles

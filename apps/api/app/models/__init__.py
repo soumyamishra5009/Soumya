@@ -10,12 +10,20 @@ from app.models.enums import (  # noqa: F401
     TaskPriority,
     DecisionImpact,
     ProposalStatus,
+    RepoProvider,
+    PullRequestStatus,
+    PlanStatus,
 )
 from app.models.user import User, Account  # noqa: F401
 from app.models.workspace import Workspace, WorkspaceMember  # noqa: F401
 from app.models.meeting import Meeting, Transcript, TranscriptSegment, Decision  # noqa: F401
 from app.models.task import Task  # noqa: F401
 from app.models.code import CodeProposal  # noqa: F401
+from app.models.ship import (  # noqa: F401
+    RepoConnection,
+    CodePlan,
+    PullRequestProposal,
+)
 
 __all__ = [
     "Base",
@@ -27,6 +35,9 @@ __all__ = [
     "TaskPriority",
     "DecisionImpact",
     "ProposalStatus",
+    "RepoProvider",
+    "PullRequestStatus",
+    "PlanStatus",
     "User",
     "Account",
     "Workspace",
@@ -37,4 +48,7 @@ __all__ = [
     "Decision",
     "Task",
     "CodeProposal",
+    "RepoConnection",
+    "CodePlan",
+    "PullRequestProposal",
 ]

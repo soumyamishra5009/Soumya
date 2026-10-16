@@ -141,6 +141,10 @@ def normalize_rel(rel_path: str) -> str:
     parts = [p for p in raw.split("/") if p not in ("", ".")]
     if any(p == ".." for p in parts):
         raise SandboxError("Path traversal is not allowed")
+    # The git metadata directory is managed by the app, never through the file
+    # API — otherwise a delete could nuke the workspace's repository.
+    if any(p == ".git" for p in parts):
+        raise SandboxError("The .git directory is managed automatically")
     if not parts:
         raise SandboxError("A file path is required")
     return "/".join(parts)

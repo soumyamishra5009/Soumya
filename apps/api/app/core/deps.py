@@ -53,6 +53,15 @@ def require_workspace_member(
     db: Session = Depends(get_db),
 ) -> Workspace:
     """Ensure the current user is a member of the given workspace."""
+    return assert_workspace_member(db, workspace_id, user)
+
+
+def assert_workspace_member(db: Session, workspace_id: str, user: User) -> Workspace:
+    """Non-dependency form of :func:`require_workspace_member`.
+
+    Used by routers that need to resolve a workspace by an id taken from the
+    request body/path before deciding what to do.
+    """
     workspace = db.get(Workspace, workspace_id)
     if workspace is None:
         raise HTTPException(status_code=404, detail="Workspace not found")
@@ -67,6 +76,28 @@ def require_workspace_member(
     )
     if member is None and workspace.owner_id != user.id:
         raise HTTPException(status_code=403, detail="Not a member of this workspace")
+    return workspace
+
+
+def assert_workspace_admin(db: Session, workspace_id: str, user: User) -> Workspace:
+    """Like :func:`assert_workspace_member` but requires owner/admin rights."""
+    workspace = assert_workspace_member(db, workspace_id, user)
+    if workspace.owner_id == user.id:
+        return workspace
+
+    member = (
+        db.query(WorkspaceMember)
+        .filter(
+            WorkspaceMember.workspace_id == workspace_id,
+            WorkspaceMember.user_id == user.id,
+        )
+        .first()
+    )
+    role = member.role if member else WorkspaceRole.VIEWER.value
+    if role not in (WorkspaceRole.OWNER.value, WorkspaceRole.ADMIN.value):
+        raise HTTPException(
+            status_code=403, detail="Only workspace owners and admins can do this"
+        )
     return workspace
 
 

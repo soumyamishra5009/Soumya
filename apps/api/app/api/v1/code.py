@@ -13,9 +13,8 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
-from app.core.config import settings
 from app.core.database import get_db
-from app.core.deps import get_current_user
+from app.core.deps import assert_workspace_member, get_current_user
 from app.models.code import CodeProposal
 from app.models.enums import ProposalStatus
 from app.models.meeting import Meeting
@@ -37,7 +36,7 @@ from app.schemas.code import (
     StudioFile,
     StudioTree,
 )
-from app.services import devstudio
+from app.services import devstudio, proposals
 
 logger = logging.getLogger(__name__)
 
@@ -50,20 +49,7 @@ router = APIRouter(tags=["studio"])
 
 
 def _assert_member(db: Session, workspace_id: str, user: User) -> Workspace:
-    workspace = db.get(Workspace, workspace_id)
-    if workspace is None:
-        raise HTTPException(status_code=404, detail="Workspace not found")
-    member = (
-        db.query(WorkspaceMember)
-        .filter(
-            WorkspaceMember.workspace_id == workspace_id,
-            WorkspaceMember.user_id == user.id,
-        )
-        .first()
-    )
-    if member is None and workspace.owner_id != user.id:
-        raise HTTPException(status_code=403, detail="Not a member of this workspace")
-    return workspace
+    return assert_workspace_member(db, workspace_id, user)
 
 
 def _sandbox_error(exc: devstudio.SandboxError) -> HTTPException:
@@ -141,13 +127,7 @@ def _task_context(db: Session, task_id: str | None, user: User) -> str | None:
 
 def _current_content(workspace_id: str, rel_path: str) -> str | None:
     """Read the file ignoring editor limits (used for hash comparison)."""
-    path, _ = devstudio.resolve_path(workspace_id, rel_path)
-    if not path.exists() or not path.is_file():
-        return None
-    try:
-        return path.read_text(encoding="utf-8")
-    except (UnicodeDecodeError, OSError):
-        return None
+    return proposals.current_content(workspace_id, rel_path)
 
 
 def _get_proposal(db: Session, workspace_id: str, proposal_id: str) -> CodeProposal:
@@ -393,49 +373,22 @@ def create_proposal(
     _assert_member(db, workspace_id, user)
 
     try:
-        rel = devstudio.normalize_rel(payload.file_path)
-    except devstudio.SandboxError as exc:
-        raise _sandbox_error(exc)
-
-    original = _current_content(workspace_id, rel)
-    language = devstudio.language_for(rel)
-
-    result = devstudio.ai_code_proposal(
-        rel,
-        payload.instruction,
-        content=original,
-        language=language,
-        meeting_context=_meeting_context(db, payload.meeting_id, user),
-        task_context=_task_context(db, payload.task_id, user),
-    )
-
-    proposed = result["proposed_content"]
-    if len(proposed.encode("utf-8")) > devstudio.max_file_bytes():
-        raise HTTPException(
-            status_code=413,
-            detail=(
-                "Proposed contents exceed the "
-                f"{settings.DEVSTUDIO_MAX_FILE_KB} KB file limit"
-            ),
+        proposal = proposals.build_code_proposal(
+            workspace_id,
+            payload.file_path,
+            payload.instruction,
+            meeting_id=payload.meeting_id,
+            task_id=payload.task_id,
+            created_by=user.id,
+            meeting_context=_meeting_context(db, payload.meeting_id, user),
+            task_context=_task_context(db, payload.task_id, user),
         )
+    except proposals.ProposalError as exc:
+        message = str(exc)
+        if "limit" in message:
+            raise HTTPException(status_code=413, detail=message)
+        raise _sandbox_error(devstudio.SandboxError(message))
 
-    added, removed = devstudio.diff_stats(original, proposed)
-    proposal = CodeProposal(
-        workspace_id=workspace_id,
-        file_path=rel,
-        language=language,
-        original_content=original,
-        proposed_content=proposed,
-        rationale=result.get("rationale"),
-        source=result.get("source", "fallback"),
-        status=ProposalStatus.PENDING.value,
-        base_hash=devstudio.content_hash(original),
-        added_lines=added,
-        removed_lines=removed,
-        meeting_id=payload.meeting_id,
-        task_id=payload.task_id,
-        created_by=user.id,
-    )
     db.add(proposal)
     db.commit()
     db.refresh(proposal)

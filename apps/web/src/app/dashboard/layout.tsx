@@ -8,6 +8,7 @@ import {
   AudioLines,
   KanbanSquare,
   Code2,
+  GitPullRequest,
   Users,
   LogOut,
   Loader2,
@@ -28,6 +29,7 @@ const NAV = [
   { href: "/dashboard/tasks", label: "Task Board", icon: KanbanSquare, ready: true },
   { href: "/dashboard/team", label: "Team", icon: Users, ready: true },
   { href: "/dashboard/studio", label: "Dev Studio", icon: Code2, ready: true },
+  { href: "/dashboard/agent", label: "Meeting → Code", icon: GitPullRequest, ready: true },
 ];
 
 function Shell({ children }: { children: ReactNode }) {
