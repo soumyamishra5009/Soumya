@@ -124,6 +124,29 @@ instead (the meeting is marked `failed` with the reason surfaced).
 | LLM | Offline fallback or local Ollama | Ollama or OpenRouter |
 | STT | faster-whisper local | faster-whisper or Groq |
 
+### Dev-DB schema evolution
+
+`Base.metadata.create_all()` creates missing *tables* but never missing *columns*, so
+`init_db()` also runs `_ensure_columns()` (`app/core/database.py`) — an idempotent list of
+additive `ALTER TABLE … ADD COLUMN` statements (e.g. `meetings.archived`). This keeps local
+SQLite zero-setup; **production uses Alembic** (`apps/api/alembic`).
+
+## API Surface (Phase 2)
+
+| Method | Path | Purpose |
+|---|---|---|
+| `GET/POST` | `/api/v1/workspaces/{id}/members` | List members / add an existing account by email |
+| `DELETE` | `/api/v1/workspaces/{id}/members/{user_id}` | Remove a member (owner/admin only) |
+| `GET` | `/api/v1/workspaces/{id}/tasks` | Filterable tasks: `task_status`, `assignee_id` (`me`/`unassigned`), `priority`, `q`, `meeting_id`, `due_before`, `due_after` |
+| `GET` | `/api/v1/workspaces/{id}/meetings` | Meeting history: `q`, `meeting_status`, `archived` (default = active only) |
+| `PATCH` | `/api/v1/meetings/{id}` | Edit metadata and **editable AI output** (summary, key points, risks, questions, next steps) + `archived` |
+| `POST` | `/api/v1/meetings/{id}/decisions` | Record a decision the AI missed |
+| `PATCH/DELETE` | `/api/v1/decisions/{id}` | Edit / delete a decision |
+
+Assignees are validated to be workspace members (`_assert_assignee`), and member management
+requires the owner/admin role. Re-processing a meeting regenerates its AI-derived decisions
+and tasks (human edits to those rows are intentionally overwritten).
+
 ## API Auth & Media
 
 - Phase 1 uses **JWT issued by FastAPI** (`bcrypt` + HS256), sent as `Authorization: Bearer`.

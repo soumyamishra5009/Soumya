@@ -14,6 +14,9 @@ import {
   Clock,
   AlertTriangle,
   RefreshCw,
+  Search,
+  Archive,
+  ArchiveRestore,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -50,6 +53,8 @@ export default function MeetingsPage() {
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
   const [creating, setCreating] = React.useState(false);
+  const [query, setQuery] = React.useState("");
+  const [view, setView] = React.useState<"active" | "archived">("active");
 
   // form state
   const [title, setTitle] = React.useState("");
@@ -61,30 +66,52 @@ export default function MeetingsPage() {
   const [submitting, setSubmitting] = React.useState(false);
   const [dragging, setDragging] = React.useState(false);
 
-  const load = React.useCallback(async () => {
-    if (!workspace) return;
-    setLoading(true);
-    setError(null);
-    try {
-      setMeetings(await api.listMeetings(workspace.id));
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Failed to load meetings");
-    } finally {
-      setLoading(false);
-    }
-  }, [workspace]);
+  const load = React.useCallback(
+    async (opts: { silent?: boolean } = {}) => {
+      if (!workspace) return;
+      if (!opts.silent) setLoading(true);
+      setError(null);
+      try {
+        setMeetings(
+          await api.listMeetings(workspace.id, {
+            q: query.trim() || undefined,
+            archived: view === "archived",
+          })
+        );
+      } catch (err) {
+        setError(err instanceof ApiError ? err.message : "Failed to load meetings");
+      } finally {
+        if (!opts.silent) setLoading(false);
+      }
+    },
+    [workspace, query, view]
+  );
 
+  // Debounced reload when the search text or view changes.
   React.useEffect(() => {
-    void load();
-  }, [load]);
+    const t = setTimeout(() => void load(), query ? 300 : 0);
+    return () => clearTimeout(t);
+  }, [load, query]);
 
   // Keep polling while any meeting is processing
   React.useEffect(() => {
     const anyBusy = meetings.some((m) => isMeetingBusy(m.status));
     if (!anyBusy) return;
-    const t = setTimeout(() => void load(), 3000);
+    const t = setTimeout(() => void load({ silent: true }), 3000);
     return () => clearTimeout(t);
   }, [meetings, load]);
+
+  async function toggleArchive(m: Meeting, e: React.MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    try {
+      await api.updateMeeting(m.id, { archived: !m.archived });
+      toast.success(m.archived ? "Restored to history" : "Moved to archive");
+      await load({ silent: true });
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Could not update meeting");
+    }
+  }
 
   function resetForm() {
     setTitle("");
@@ -156,6 +183,40 @@ export default function MeetingsPage() {
             {creating ? <X className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
             {creating ? "Cancel" : "New meeting"}
           </Button>
+        </div>
+      </div>
+
+      {/* Search + history/archive toggle */}
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="relative min-w-[16rem] flex-1">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search meetings…"
+            className="pl-9"
+          />
+        </div>
+        <div className="flex gap-1 rounded-lg border bg-muted/30 p-1">
+          {(
+            [
+              { id: "active", label: "History", icon: AudioLines },
+              { id: "archived", label: "Archive", icon: Archive },
+            ] as const
+          ).map((v) => (
+            <button
+              key={v.id}
+              onClick={() => setView(v.id)}
+              className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                view === v.id
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <v.icon className="h-3.5 w-3.5" />
+              {v.label}
+            </button>
+          ))}
         </div>
       </div>
 
@@ -323,15 +384,33 @@ export default function MeetingsPage() {
       ) : meetings.length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-16 text-center">
-            <AudioLines className="h-10 w-10 text-muted-foreground" />
-            <p className="mt-4 font-medium">No meetings yet</p>
-            <p className="mt-1 max-w-sm text-sm text-muted-foreground">
-              Upload your first recording to see the full pipeline in action.
-            </p>
-            <Button className="mt-4" onClick={() => setCreating(true)}>
-              <Plus className="h-4 w-4" />
-              New meeting
-            </Button>
+            {view === "archived" ? (
+              <>
+                <Archive className="h-10 w-10 text-muted-foreground" />
+                <p className="mt-4 font-medium">No archived meetings</p>
+                <p className="mt-1 max-w-sm text-sm text-muted-foreground">
+                  Meetings you archive will show up here.
+                </p>
+              </>
+            ) : (
+              <>
+                <AudioLines className="h-10 w-10 text-muted-foreground" />
+                <p className="mt-4 font-medium">
+                  {query.trim() ? "No meetings match your search" : "No meetings yet"}
+                </p>
+                <p className="mt-1 max-w-sm text-sm text-muted-foreground">
+                  {query.trim()
+                    ? "Try a different search term."
+                    : "Upload your first recording to see the full pipeline in action."}
+                </p>
+                {!query.trim() && (
+                  <Button className="mt-4" onClick={() => setCreating(true)}>
+                    <Plus className="h-4 w-4" />
+                    New meeting
+                  </Button>
+                )}
+              </>
+            )}
           </CardContent>
         </Card>
       ) : (
@@ -346,12 +425,27 @@ export default function MeetingsPage() {
                       <CardTitle className="line-clamp-2 text-base">
                         {m.title}
                       </CardTitle>
-                      <Badge
-                        variant={meta.variant}
-                        className={meta.pulse ? "animate-pulse shrink-0" : "shrink-0"}
-                      >
-                        {meta.label}
-                      </Badge>
+                      <div className="flex shrink-0 items-center gap-1">
+                        <Badge
+                          variant={meta.variant}
+                          className={meta.pulse ? "animate-pulse" : undefined}
+                        >
+                          {meta.label}
+                        </Badge>
+                        <button
+                          type="button"
+                          aria-label={m.archived ? "Restore meeting" : "Archive meeting"}
+                          title={m.archived ? "Restore" : "Archive"}
+                          onClick={(e) => void toggleArchive(m, e)}
+                          className="rounded p-1 text-muted-foreground transition-colors hover:bg-accent/20 hover:text-foreground"
+                        >
+                          {m.archived ? (
+                            <ArchiveRestore className="h-3.5 w-3.5" />
+                          ) : (
+                            <Archive className="h-3.5 w-3.5" />
+                          )}
+                        </button>
+                      </div>
                     </div>
                     {m.description && (
                       <CardDescription className="line-clamp-2">

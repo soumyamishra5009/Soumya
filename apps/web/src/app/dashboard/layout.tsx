@@ -8,6 +8,7 @@ import {
   AudioLines,
   KanbanSquare,
   Code2,
+  Users,
   LogOut,
   Loader2,
   Sparkles,
@@ -15,6 +16,7 @@ import {
 } from "lucide-react";
 
 import { AuthProvider, useAuth } from "@/components/auth-provider";
+import { MembersProvider } from "@/components/members-provider";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -24,6 +26,7 @@ const NAV = [
   { href: "/dashboard", label: "Overview", icon: LayoutDashboard, ready: true },
   { href: "/dashboard/meetings", label: "Meetings", icon: AudioLines, ready: true },
   { href: "/dashboard/tasks", label: "Task Board", icon: KanbanSquare, ready: true },
+  { href: "/dashboard/team", label: "Team", icon: Users, ready: true },
   { href: "/dashboard/studio", label: "Dev Studio", icon: Code2, ready: false },
 ];
 
@@ -174,7 +177,9 @@ function Shell({ children }: { children: ReactNode }) {
 export default function DashboardLayout({ children }: { children: ReactNode }) {
   return (
     <AuthProvider>
-      <Shell>{children}</Shell>
+      <MembersProvider>
+        <Shell>{children}</Shell>
+      </MembersProvider>
     </AuthProvider>
   );
 }

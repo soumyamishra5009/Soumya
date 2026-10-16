@@ -15,6 +15,8 @@ import {
 } from "lucide-react";
 
 import { useAuth } from "@/components/auth-provider";
+import { useMembers } from "@/components/members-provider";
+import { MemberAvatar } from "@/components/member-avatar";
 import { api, ApiError } from "@/lib/api";
 import type { Meeting, Task } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
@@ -62,6 +64,7 @@ function StatCard({
 
 export default function DashboardPage() {
   const { workspace } = useAuth();
+  const { byId } = useMembers();
   const [meetings, setMeetings] = React.useState<Meeting[]>([]);
   const [tasks, setTasks] = React.useState<Task[]>([]);
   const [loading, setLoading] = React.useState(true);
@@ -275,6 +278,11 @@ export default function DashboardPage() {
                             </p>
                           )}
                         </div>
+                        <MemberAvatar
+                          member={t.assignee_id ? byId[t.assignee_id] : undefined}
+                          size="xs"
+                          className="mt-0.5"
+                        />
                       </li>
                     );
                   })}
@@ -288,7 +296,8 @@ export default function DashboardPage() {
         <CardHeader>
           <CardTitle className="text-base">How it works</CardTitle>
           <CardDescription>
-            Phase 1 is live: audio in, structured outcomes out.
+            Phases 1 &amp; 2 are live: audio in, structured outcomes out —
+            editable by your team.
           </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4 sm:grid-cols-3">

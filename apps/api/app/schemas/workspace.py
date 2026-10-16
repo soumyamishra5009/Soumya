@@ -30,3 +30,26 @@ class WorkspaceMemberOut(BaseModel):
     invited_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class MemberOut(BaseModel):
+    """A workspace member enriched with the user's profile (for assignees)."""
+
+    membership_id: str
+    user_id: str
+    name: str
+    email: str
+    image: str | None = None
+    role: str
+    is_owner: bool = False
+    accepted_at: datetime | None = None
+    invited_at: datetime
+
+
+class MemberAdd(BaseModel):
+    email: str = Field(
+        min_length=5,
+        max_length=255,
+        pattern=r"^[^@\s]+@[^@\s]+\.[^@\s]+$",
+    )
+    role: str = Field(default="member", pattern=r"^(admin|member|viewer)$")

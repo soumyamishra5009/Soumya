@@ -2,6 +2,7 @@
 
 from datetime import datetime, timezone
 
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from app.models.task import Task
@@ -81,10 +82,35 @@ class TaskCRUD:
     def list_by_workspace(
         self, db: Session, workspace_id: str,
         status: str | None = None, skip: int = 0, limit: int = 200,
+        assignee_id: str | None = None, unassigned: bool = False,
+        priority: str | None = None, q: str | None = None,
+        meeting_id: str | None = None,
+        due_before: datetime | None = None, due_after: datetime | None = None,
     ) -> list[Task]:
+        """Filterable task list powering the board, "My tasks" and due-date views."""
         query = db.query(Task).filter(Task.workspace_id == workspace_id)
         if status:
             query = query.filter(Task.status == status)
+        if unassigned:
+            query = query.filter(Task.assignee_id.is_(None))
+        elif assignee_id:
+            query = query.filter(Task.assignee_id == assignee_id)
+        if priority:
+            query = query.filter(Task.priority == priority)
+        if meeting_id:
+            query = query.filter(Task.meeting_id == meeting_id)
+        if q:
+            needle = f"%{q.strip().lower()}%"
+            query = query.filter(
+                or_(
+                    func.lower(Task.title).like(needle),
+                    func.lower(func.coalesce(Task.description, "")).like(needle),
+                )
+            )
+        if due_before:
+            query = query.filter(Task.due_date.isnot(None), Task.due_date <= due_before)
+        if due_after:
+            query = query.filter(Task.due_date.isnot(None), Task.due_date >= due_after)
         return (
             query.order_by(Task.sequence, Task.created_at)
             .offset(skip).limit(limit).all()

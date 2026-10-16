@@ -47,6 +47,18 @@ export interface Workspace {
   created_at: string;
 }
 
+export interface Member {
+  membership_id: string;
+  user_id: string;
+  name: string;
+  email: string;
+  image: string | null;
+  role: string;
+  is_owner: boolean;
+  accepted_at: string | null;
+  invited_at: string;
+}
+
 export interface Decision {
   id: string;
   meeting_id: string;
@@ -100,6 +112,7 @@ export interface Meeting {
   next_steps: string[] | null;
   error_message: string | null;
   language: string | null;
+  archived: boolean;
   created_at: string;
   updated_at: string;
 }

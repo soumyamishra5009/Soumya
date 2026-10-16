@@ -2,10 +2,16 @@
 
 from datetime import datetime, timezone
 
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session, joinedload
 
 from app.models.meeting import Meeting, Transcript, TranscriptSegment, Decision
-from app.schemas.meeting import MeetingCreate
+from app.schemas.meeting import (
+    DecisionCreate,
+    DecisionUpdate,
+    MeetingCreate,
+    MeetingUpdate,
+)
 
 
 class MeetingCRUD:
@@ -37,16 +43,49 @@ class MeetingCRUD:
         return meeting
 
     def list_by_workspace(
-        self, db: Session, workspace_id: str, skip: int = 0, limit: int = 50
+        self,
+        db: Session,
+        workspace_id: str,
+        skip: int = 0,
+        limit: int = 50,
+        q: str | None = None,
+        status: str | None = None,
+        archived: bool | None = None,
     ) -> list[Meeting]:
+        """List meetings, defaulting to the active (non-archived) history."""
+        query = db.query(Meeting).filter(Meeting.workspace_id == workspace_id)
+        if q:
+            needle = f"%{q.strip().lower()}%"
+            query = query.filter(
+                or_(
+                    func.lower(Meeting.title).like(needle),
+                    func.lower(func.coalesce(Meeting.description, "")).like(needle),
+                )
+            )
+        if status:
+            query = query.filter(Meeting.status == status)
+        if archived is None:
+            query = query.filter(Meeting.archived.is_(False))
+        else:
+            query = query.filter(Meeting.archived.is_(archived))
         return (
-            db.query(Meeting)
-            .filter(Meeting.workspace_id == workspace_id)
-            .order_by(Meeting.created_at.desc())
+            query.order_by(Meeting.created_at.desc())
             .offset(skip)
             .limit(limit)
             .all()
         )
+
+    def update(self, db: Session, meeting_id: str, obj_in: MeetingUpdate) -> Meeting | None:
+        """Apply a partial update (meeting metadata and/or editable AI output)."""
+        meeting = db.get(Meeting, meeting_id)
+        if meeting is None:
+            return None
+        data = obj_in.model_dump(exclude_unset=True)
+        for key, value in data.items():
+            setattr(meeting, key, value)
+        db.commit()
+        db.refresh(meeting)
+        return meeting
 
     def update_status(
         self, db: Session, meeting_id: str, status: str, error_message: str | None = None
@@ -120,6 +159,9 @@ class TranscriptCRUD:
 
 
 class DecisionCRUD:
+    def get(self, db: Session, decision_id: str) -> Decision | None:
+        return db.get(Decision, decision_id)
+
     def list_by_meeting(self, db: Session, meeting_id: str) -> list[Decision]:
         return (
             db.query(Decision)
@@ -127,6 +169,47 @@ class DecisionCRUD:
             .order_by(Decision.sequence)
             .all()
         )
+
+    def create(self, db: Session, meeting_id: str, obj_in: DecisionCreate) -> Decision:
+        """Add a decision the AI missed (human-in-the-loop)."""
+        max_seq = (
+            db.query(func.max(Decision.sequence))
+            .filter(Decision.meeting_id == meeting_id)
+            .scalar()
+        )
+        row = Decision(
+            meeting_id=meeting_id,
+            title=obj_in.title,
+            description=obj_in.description,
+            impact=obj_in.impact,
+            rationale=obj_in.rationale,
+            sequence=(max_seq or 0) + 1,
+        )
+        db.add(row)
+        db.commit()
+        db.refresh(row)
+        return row
+
+    def update(
+        self, db: Session, decision_id: str, obj_in: DecisionUpdate
+    ) -> Decision | None:
+        row = db.get(Decision, decision_id)
+        if row is None:
+            return None
+        data = obj_in.model_dump(exclude_unset=True)
+        for key, value in data.items():
+            setattr(row, key, value)
+        db.commit()
+        db.refresh(row)
+        return row
+
+    def delete(self, db: Session, decision_id: str) -> bool:
+        row = db.get(Decision, decision_id)
+        if row is None:
+            return False
+        db.delete(row)
+        db.commit()
+        return True
 
     def bulk_create(self, db: Session, meeting_id: str, decisions: list[dict]) -> list[Decision]:
         # Clear previous decisions for idempotency

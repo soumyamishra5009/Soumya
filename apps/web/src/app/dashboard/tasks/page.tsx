@@ -11,10 +11,15 @@ import {
   Clock,
   Link2,
   X,
+  Search,
+  Pencil,
+  FilterX,
 } from "lucide-react";
 import { toast } from "sonner";
 
 import { useAuth } from "@/components/auth-provider";
+import { useMembers } from "@/components/members-provider";
+import { MemberAvatar } from "@/components/member-avatar";
 import { api, ApiError } from "@/lib/api";
 import type { Task, TaskPriority, TaskStatus } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
@@ -32,50 +37,116 @@ import {
 } from "@/lib/format";
 
 const PRIORITIES: TaskPriority[] = ["low", "medium", "high", "urgent"];
+const DUE_FILTERS = [
+  { id: "", label: "Any due date" },
+  { id: "overdue", label: "Overdue" },
+  { id: "today", label: "Due today" },
+  { id: "week", label: "Due this week" },
+] as const;
+
+type DueFilter = (typeof DUE_FILTERS)[number]["id"];
+
+function toDateInput(value: string | null): string {
+  if (!value) return "";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toISOString().slice(0, 10);
+}
+
+function startOfToday(): Date {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
 
 export default function TasksPage() {
   const { workspace } = useAuth();
+  const { members, byId } = useMembers();
+
   const [tasks, setTasks] = React.useState<Task[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
   const [dragId, setDragId] = React.useState<string | null>(null);
   const [overColumn, setOverColumn] = React.useState<TaskStatus | null>(null);
-  const [adding, setAdding] = React.useState(false);
 
-  // new task form
+  // filters
+  const [query, setQuery] = React.useState("");
+  const [assignee, setAssignee] = React.useState(""); // "" | "me" | "unassigned" | userId
+  const [priority, setPriority] = React.useState(""); // "" | TaskPriority
+  const [due, setDue] = React.useState<DueFilter>("");
+
+  // create/edit panel
+  const [formOpen, setFormOpen] = React.useState(false);
+  const [editId, setEditId] = React.useState<string | null>(null);
   const [title, setTitle] = React.useState("");
   const [description, setDescription] = React.useState("");
-  const [priority, setPriority] = React.useState<TaskPriority>("medium");
+  const [formPriority, setFormPriority] = React.useState<TaskPriority>("medium");
+  const [formStatus, setFormStatus] = React.useState<TaskStatus>("todo");
   const [dueDate, setDueDate] = React.useState("");
+  const [assigneeId, setAssigneeId] = React.useState("");
+  const [estimatedHours, setEstimatedHours] = React.useState("");
   const [saving, setSaving] = React.useState(false);
 
-  const load = React.useCallback(async () => {
-    if (!workspace) return;
-    setLoading(true);
-    setError(null);
-    try {
-      setTasks(await api.listTasks(workspace.id));
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Failed to load tasks");
-    } finally {
-      setLoading(false);
+  const dueRange = React.useMemo(() => {
+    const now = new Date();
+    if (due === "overdue") return { dueBefore: now.toISOString() };
+    if (due === "today") {
+      const start = startOfToday();
+      const end = new Date(start);
+      end.setDate(end.getDate() + 1);
+      return { dueAfter: start.toISOString(), dueBefore: end.toISOString() };
     }
-  }, [workspace]);
+    if (due === "week") {
+      const end = new Date(now);
+      end.setDate(end.getDate() + 7);
+      return { dueAfter: now.toISOString(), dueBefore: end.toISOString() };
+    }
+    return {};
+  }, [due]);
 
+  const load = React.useCallback(
+    async (opts: { silent?: boolean } = {}) => {
+      if (!workspace) return;
+      if (!opts.silent) setLoading(true);
+      setError(null);
+      try {
+        const rows = await api.listTasks(workspace.id, {
+          q: query.trim() || undefined,
+          assignee: assignee || undefined,
+          priority: (priority || undefined) as TaskPriority | undefined,
+          ...dueRange,
+        });
+        setTasks(rows);
+      } catch (err) {
+        setError(err instanceof ApiError ? err.message : "Failed to load tasks");
+      } finally {
+        if (!opts.silent) setLoading(false);
+      }
+    },
+    [workspace, query, assignee, priority, dueRange]
+  );
+
+  // Debounced reload on filter changes.
   React.useEffect(() => {
-    void load();
-  }, [load]);
+    const t = setTimeout(() => void load(), query ? 300 : 0);
+    return () => clearTimeout(t);
+  }, [load, query]);
+
+  const filtersActive = Boolean(query || assignee || priority || due);
+
+  function resetFilters() {
+    setQuery("");
+    setAssignee("");
+    setPriority("");
+    setDue("");
+  }
 
   async function moveTask(taskId: string, status: TaskStatus) {
     const current = tasks.find((t) => t.id === taskId);
     if (!current || current.status === status) return;
 
     const previous = tasks;
-    // optimistic update
-    setTasks((prev) =>
-      prev.map((t) => (t.id === taskId ? { ...t, status } : t))
-    );
-
+    setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, status } : t)));
     try {
       const updated = await api.updateTask(taskId, { status });
       setTasks((prev) => prev.map((t) => (t.id === taskId ? updated : t)));
@@ -101,7 +172,31 @@ export default function TasksPage() {
     }
   }
 
-  async function onCreate(e: React.FormEvent) {
+  function openCreate() {
+    setEditId(null);
+    setTitle("");
+    setDescription("");
+    setFormPriority("medium");
+    setFormStatus("todo");
+    setDueDate("");
+    setAssigneeId("");
+    setEstimatedHours("");
+    setFormOpen(true);
+  }
+
+  function openEdit(t: Task) {
+    setEditId(t.id);
+    setTitle(t.title);
+    setDescription(t.description ?? "");
+    setFormPriority(t.priority);
+    setFormStatus(t.status);
+    setDueDate(toDateInput(t.due_date));
+    setAssigneeId(t.assignee_id ?? "");
+    setEstimatedHours(t.estimated_hours ? String(t.estimated_hours) : "");
+    setFormOpen(true);
+  }
+
+  async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!workspace || saving) return;
     if (!title.trim()) {
@@ -109,23 +204,35 @@ export default function TasksPage() {
       return;
     }
     setSaving(true);
+    const hours = estimatedHours.trim() ? Number(estimatedHours) : null;
     try {
-      const created = await api.createTask({
-        workspace_id: workspace.id,
-        title: title.trim(),
-        description: description.trim() || null,
-        priority,
-        due_date: dueDate ? new Date(dueDate).toISOString() : null,
-      });
-      setTasks((prev) => [...prev, created]);
-      setTitle("");
-      setDescription("");
-      setPriority("medium");
-      setDueDate("");
-      setAdding(false);
-      toast.success("Task added");
+      if (editId) {
+        await api.updateTask(editId, {
+          title: title.trim(),
+          description: description.trim() || null,
+          priority: formPriority,
+          status: formStatus,
+          due_date: dueDate ? new Date(dueDate).toISOString() : null,
+          assignee_id: assigneeId || null,
+          estimated_hours: hours,
+        });
+        toast.success("Task updated");
+      } else {
+        await api.createTask({
+          workspace_id: workspace.id,
+          title: title.trim(),
+          description: description.trim() || null,
+          priority: formPriority,
+          status: formStatus,
+          due_date: dueDate ? new Date(dueDate).toISOString() : null,
+          assignee_id: assigneeId || null,
+        });
+        toast.success("Task added");
+      }
+      setFormOpen(false);
+      await load({ silent: true });
     } catch (err) {
-      toast.error(err instanceof ApiError ? err.message : "Could not create task");
+      toast.error(err instanceof ApiError ? err.message : "Could not save task");
     } finally {
       setSaving(false);
     }
@@ -164,17 +271,85 @@ export default function TasksPage() {
           >
             <RefreshCw className="h-4 w-4" />
           </Button>
-          <Button onClick={() => setAdding((v) => !v)}>
-            {adding ? <X className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
-            {adding ? "Cancel" : "New task"}
+          <Button onClick={() => (formOpen ? setFormOpen(false) : openCreate())}>
+            {formOpen ? <X className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+            {formOpen ? "Cancel" : "New task"}
           </Button>
         </div>
       </div>
 
-      {adding && (
+      {/* Filter bar */}
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="relative min-w-[14rem] flex-1">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search tasks…"
+            className="pl-9"
+          />
+        </div>
+        <Button
+          variant={assignee === "me" ? "default" : "outline"}
+          size="sm"
+          onClick={() => setAssignee((v) => (v === "me" ? "" : "me"))}
+        >
+          My tasks
+        </Button>
+        <select
+          aria-label="Assignee"
+          value={assignee}
+          onChange={(e) => setAssignee(e.target.value)}
+          className="h-9 rounded-md border border-input bg-background px-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          <option value="">All assignees</option>
+          <option value="unassigned">Unassigned</option>
+          {members.map((m) => (
+            <option key={m.user_id} value={m.user_id}>
+              {m.name}
+            </option>
+          ))}
+        </select>
+        <select
+          aria-label="Priority"
+          value={priority}
+          onChange={(e) => setPriority(e.target.value)}
+          className="h-9 rounded-md border border-input bg-background px-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          <option value="">Any priority</option>
+          {PRIORITIES.map((p) => (
+            <option key={p} value={p}>
+              {TASK_PRIORITY_META[p].label}
+            </option>
+          ))}
+        </select>
+        <select
+          aria-label="Due date"
+          value={due}
+          onChange={(e) => setDue(e.target.value as DueFilter)}
+          className="h-9 rounded-md border border-input bg-background px-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          {DUE_FILTERS.map((d) => (
+            <option key={d.id} value={d.id}>
+              {d.label}
+            </option>
+          ))}
+        </select>
+        {filtersActive && (
+          <Button variant="ghost" size="sm" onClick={resetFilters}>
+            <FilterX className="h-4 w-4" />
+            Clear
+          </Button>
+        )}
+      </div>
+
+      {formOpen && (
         <Card>
           <CardContent className="pt-6">
-            <form onSubmit={onCreate} className="space-y-4">
+            <form onSubmit={onSubmit} className="space-y-4">
+              <p className="text-sm font-medium">
+                {editId ? "Edit task" : "New task"}
+              </p>
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label htmlFor="t-title">Title *</Label>
@@ -191,10 +366,8 @@ export default function TasksPage() {
                     <Label htmlFor="t-priority">Priority</Label>
                     <select
                       id="t-priority"
-                      value={priority}
-                      onChange={(e) =>
-                        setPriority(e.target.value as TaskPriority)
-                      }
+                      value={formPriority}
+                      onChange={(e) => setFormPriority(e.target.value as TaskPriority)}
                       className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     >
                       {PRIORITIES.map((p) => (
@@ -215,6 +388,53 @@ export default function TasksPage() {
                   </div>
                 </div>
               </div>
+
+              <div className="grid gap-4 sm:grid-cols-3">
+                <div className="space-y-2">
+                  <Label htmlFor="t-assignee">Assignee</Label>
+                  <select
+                    id="t-assignee"
+                    value={assigneeId}
+                    onChange={(e) => setAssigneeId(e.target.value)}
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    <option value="">Unassigned</option>
+                    {members.map((m) => (
+                      <option key={m.user_id} value={m.user_id}>
+                        {m.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="t-status">Status</Label>
+                  <select
+                    id="t-status"
+                    value={formStatus}
+                    onChange={(e) => setFormStatus(e.target.value as TaskStatus)}
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    {Object.entries(TASK_STATUS_META).map(([k, v]) => (
+                      <option key={k} value={k}>
+                        {v.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="t-hours">Estimated hours</Label>
+                  <Input
+                    id="t-hours"
+                    type="number"
+                    min={0}
+                    step={0.5}
+                    value={estimatedHours}
+                    onChange={(e) => setEstimatedHours(e.target.value)}
+                    placeholder="e.g. 4"
+                  />
+                </div>
+              </div>
+
               <div className="space-y-2">
                 <Label htmlFor="t-desc">Description</Label>
                 <Textarea
@@ -225,10 +445,13 @@ export default function TasksPage() {
                   placeholder="Optional details"
                 />
               </div>
-              <div className="flex justify-end">
+              <div className="flex justify-end gap-2">
+                <Button type="button" variant="ghost" onClick={() => setFormOpen(false)}>
+                  Cancel
+                </Button>
                 <Button type="submit" disabled={saving}>
                   {saving && <Loader2 className="h-4 w-4 animate-spin" />}
-                  Add task
+                  {editId ? "Save changes" : "Add task"}
                 </Button>
               </div>
             </form>
@@ -288,6 +511,7 @@ export default function TasksPage() {
                   {items.map((t) => {
                     const pm = TASK_PRIORITY_META[t.priority];
                     const due = taskDueMeta(t.due_date, t.status);
+                    const assignee = t.assignee_id ? byId[t.assignee_id] : undefined;
                     return (
                       <div
                         key={t.id}
@@ -310,6 +534,15 @@ export default function TasksPage() {
                           >
                             {t.title}
                           </p>
+                          <button
+                            type="button"
+                            aria-label="Edit task"
+                            title="Edit"
+                            onClick={() => openEdit(t)}
+                            className="rounded p-1 text-muted-foreground/50 opacity-0 transition-opacity hover:bg-accent/20 hover:text-foreground group-hover:opacity-100"
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                          </button>
                         </div>
 
                         {t.description && (
@@ -352,7 +585,16 @@ export default function TasksPage() {
                           )}
                         </div>
 
-                        {/* Quick status controls for touch / no-drag */}
+                        <div className="mt-2 flex items-center justify-between gap-2 pl-6">
+                          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                            <MemberAvatar member={assignee} size="xs" />
+                            <span className="truncate">
+                              {assignee ? assignee.name : "Unassigned"}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Quick status controls */}
                         <div className="mt-2 flex gap-1 pl-6 opacity-0 transition-opacity group-hover:opacity-100">
                           {KANBAN_COLUMNS.filter((c) => c !== col).map((c) => (
                             <button

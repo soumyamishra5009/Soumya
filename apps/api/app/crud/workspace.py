@@ -5,6 +5,7 @@ import re
 from sqlalchemy.orm import Session
 
 from app.models.workspace import Workspace, WorkspaceMember
+from app.models.user import User
 from app.models.enums import WorkspaceRole
 from app.schemas.workspace import WorkspaceCreate
 
@@ -79,6 +80,38 @@ class WorkspaceCRUD:
         db.commit()
         db.refresh(member)
         return member
+
+    def list_members(
+        self, db: Session, workspace_id: str
+    ) -> list[tuple[WorkspaceMember, User]]:
+        """Members joined with their user profile (for assignee pickers)."""
+        return (
+            db.query(WorkspaceMember, User)
+            .join(User, User.id == WorkspaceMember.user_id)
+            .filter(WorkspaceMember.workspace_id == workspace_id)
+            .order_by(WorkspaceMember.invited_at)
+            .all()
+        )
+
+    def get_member(
+        self, db: Session, workspace_id: str, user_id: str
+    ) -> WorkspaceMember | None:
+        return (
+            db.query(WorkspaceMember)
+            .filter(
+                WorkspaceMember.workspace_id == workspace_id,
+                WorkspaceMember.user_id == user_id,
+            )
+            .first()
+        )
+
+    def remove_member(self, db: Session, workspace_id: str, user_id: str) -> bool:
+        member = self.get_member(db, workspace_id, user_id)
+        if member is None:
+            return False
+        db.delete(member)
+        db.commit()
+        return True
 
 
 workspace = WorkspaceCRUD()

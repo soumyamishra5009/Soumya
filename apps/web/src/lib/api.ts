@@ -5,6 +5,7 @@
 
 import type {
   Decision,
+  Member,
   Meeting,
   MeetingSummary,
   MeetingWithDetails,
@@ -147,9 +148,35 @@ export const api = {
     });
   },
 
+  // ---- members ----
+  listMembers(workspaceId: string) {
+    return request<Member[]>(`/api/v1/workspaces/${workspaceId}/members`);
+  },
+  addMember(workspaceId: string, email: string, role = "member") {
+    return request<Member>(`/api/v1/workspaces/${workspaceId}/members`, {
+      method: "POST",
+      body: JSON.stringify({ email, role }),
+    });
+  },
+  removeMember(workspaceId: string, userId: string) {
+    return request<void>(`/api/v1/workspaces/${workspaceId}/members/${userId}`, {
+      method: "DELETE",
+    });
+  },
+
   // ---- meetings ----
-  listMeetings(workspaceId: string) {
-    return request<Meeting[]>(`/api/v1/workspaces/${workspaceId}/meetings`);
+  listMeetings(
+    workspaceId: string,
+    filters: { q?: string; archived?: boolean; status?: string } = {}
+  ) {
+    const params = new URLSearchParams();
+    if (filters.q) params.set("q", filters.q);
+    if (filters.archived !== undefined) params.set("archived", String(filters.archived));
+    if (filters.status) params.set("meeting_status", filters.status);
+    const qs = params.toString();
+    return request<Meeting[]>(
+      `/api/v1/workspaces/${workspaceId}/meetings${qs ? `?${qs}` : ""}`
+    );
   },
   createMeeting(input: {
     workspace_id: string;
@@ -169,6 +196,52 @@ export const api = {
   },
   getMeetingSummary(meetingId: string) {
     return request<MeetingSummary>(`/api/v1/meetings/${meetingId}/summary`);
+  },
+  // Human-in-the-loop: edit meeting metadata and/or the AI output.
+  updateMeeting(
+    meetingId: string,
+    patch: Partial<{
+      title: string;
+      description: string | null;
+      summary: string | null;
+      key_points: string[];
+      risks: string[];
+      unanswered_questions: string[];
+      next_steps: string[];
+      archived: boolean;
+    }>
+  ) {
+    return request<Meeting>(`/api/v1/meetings/${meetingId}`, {
+      method: "PATCH",
+      body: JSON.stringify(patch),
+    });
+  },
+  createDecision(
+    meetingId: string,
+    input: { title: string; description?: string | null; impact?: string; rationale?: string | null }
+  ) {
+    return request<Decision>(`/api/v1/meetings/${meetingId}/decisions`, {
+      method: "POST",
+      body: JSON.stringify(input),
+    });
+  },
+  updateDecision(
+    decisionId: string,
+    patch: Partial<{
+      title: string;
+      description: string | null;
+      impact: string;
+      rationale: string | null;
+      sequence: number;
+    }>
+  ) {
+    return request<Decision>(`/api/v1/decisions/${decisionId}`, {
+      method: "PATCH",
+      body: JSON.stringify(patch),
+    });
+  },
+  deleteDecision(decisionId: string) {
+    return request<void>(`/api/v1/decisions/${decisionId}`, { method: "DELETE" });
   },
   listMeetingTasks(meetingId: string) {
     return request<Task[]>(`/api/v1/meetings/${meetingId}/tasks`);
@@ -196,9 +269,28 @@ export const api = {
   },
 
   // ---- tasks ----
-  listTasks(workspaceId: string, status?: TaskStatus) {
-    const qs = status ? `?task_status=${status}` : "";
-    return request<Task[]>(`/api/v1/workspaces/${workspaceId}/tasks${qs}`);
+  listTasks(
+    workspaceId: string,
+    filters: {
+      status?: TaskStatus;
+      assignee?: string; // user id, or "me" / "unassigned"
+      priority?: TaskPriority;
+      q?: string;
+      meetingId?: string;
+      dueBefore?: string;
+      dueAfter?: string;
+    } = {}
+  ) {
+    const params = new URLSearchParams();
+    if (filters.status) params.set("task_status", filters.status);
+    if (filters.assignee) params.set("assignee_id", filters.assignee);
+    if (filters.priority) params.set("priority", filters.priority);
+    if (filters.q) params.set("q", filters.q);
+    if (filters.meetingId) params.set("meeting_id", filters.meetingId);
+    if (filters.dueBefore) params.set("due_before", filters.dueBefore);
+    if (filters.dueAfter) params.set("due_after", filters.dueAfter);
+    const qs = params.toString();
+    return request<Task[]>(`/api/v1/workspaces/${workspaceId}/tasks${qs ? `?${qs}` : ""}`);
   },
   createTask(input: {
     workspace_id: string;
@@ -206,6 +298,7 @@ export const api = {
     description?: string | null;
     status?: TaskStatus;
     priority?: TaskPriority;
+    assignee_id?: string | null;
     meeting_id?: string | null;
     due_date?: string | null;
   }) {
@@ -221,6 +314,7 @@ export const api = {
       description: string | null;
       status: TaskStatus;
       priority: TaskPriority;
+      assignee_id: string | null;
       due_date: string | null;
       estimated_hours: number | null;
       actual_hours: number | null;
@@ -234,4 +328,4 @@ export const api = {
   },
 };
 
-export type { Decision, Meeting, MeetingSummary, MeetingWithDetails, Task, Transcript, User, Workspace };
+export type { Decision, Meeting, MeetingSummary, MeetingWithDetails, Member, Task, Transcript, User, Workspace };

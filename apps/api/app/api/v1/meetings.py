@@ -13,6 +13,7 @@ from fastapi import (
     File,
     HTTPException,
     Query,
+    Response,
     status,
     UploadFile,
 )
@@ -28,10 +29,14 @@ from app.crud.meeting import (
 )
 from app.crud.task import task as task_crud
 from app.schemas.meeting import (
+    DecisionCreate,
+    DecisionOut,
+    DecisionUpdate,
     MeetingCreate,
     MeetingOut,
     MeetingOutWithDetails,
     MeetingSummaryOut,
+    MeetingUpdate,
 )
 from app.schemas.task import TaskOut
 from app.models.user import User
@@ -208,13 +213,27 @@ def create_meeting(
 @router.get("/workspaces/{workspace_id}/meetings", response_model=list[MeetingOut])
 def list_meetings(
     workspace_id: str,
+    q: str | None = Query(default=None, description="Search title and description."),
+    meeting_status: str | None = None,
+    archived: bool | None = Query(
+        default=None,
+        description="None returns active meetings; true returns only archived ones.",
+    ),
     skip: int = 0,
     limit: int = 50,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ) -> list[Meeting]:
     _assert_member(db, workspace_id, user)
-    return meeting_crud.list_by_workspace(db, workspace_id, skip=skip, limit=min(limit, 200))
+    return meeting_crud.list_by_workspace(
+        db,
+        workspace_id,
+        skip=skip,
+        limit=min(limit, 200),
+        q=q,
+        status=meeting_status,
+        archived=archived,
+    )
 
 
 @router.get("/meetings/{meeting_id}", response_model=MeetingOutWithDetails)
@@ -228,6 +247,83 @@ def get_meeting(
         raise HTTPException(status_code=404, detail="Meeting not found")
     _assert_member(db, meeting.workspace_id, user)
     return meeting
+
+
+@router.patch("/meetings/{meeting_id}", response_model=MeetingOut)
+def update_meeting(
+    meeting_id: str,
+    payload: MeetingUpdate,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> Meeting:
+    """Edit meeting metadata and/or the AI output (human-in-the-loop)."""
+    meeting = meeting_crud.get(db, meeting_id)
+    if meeting is None:
+        raise HTTPException(status_code=404, detail="Meeting not found")
+    _assert_member(db, meeting.workspace_id, user)
+
+    updated = meeting_crud.update(db, meeting_id, payload)
+    if updated is None:
+        raise HTTPException(status_code=404, detail="Meeting not found")
+    return updated
+
+
+@router.post(
+    "/meetings/{meeting_id}/decisions",
+    response_model=DecisionOut,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_decision(
+    meeting_id: str,
+    payload: DecisionCreate,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> Decision:
+    """Record a decision the AI missed."""
+    meeting = meeting_crud.get(db, meeting_id)
+    if meeting is None:
+        raise HTTPException(status_code=404, detail="Meeting not found")
+    _assert_member(db, meeting.workspace_id, user)
+    return decision_crud.create(db, meeting_id, payload)
+
+
+@router.patch("/decisions/{decision_id}", response_model=DecisionOut)
+def update_decision(
+    decision_id: str,
+    payload: DecisionUpdate,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> Decision:
+    decision = decision_crud.get(db, decision_id)
+    if decision is None:
+        raise HTTPException(status_code=404, detail="Decision not found")
+    meeting = meeting_crud.get(db, decision.meeting_id)
+    if meeting is None:
+        raise HTTPException(status_code=404, detail="Meeting not found")
+    _assert_member(db, meeting.workspace_id, user)
+
+    updated = decision_crud.update(db, decision_id, payload)
+    if updated is None:
+        raise HTTPException(status_code=404, detail="Decision not found")
+    return updated
+
+
+@router.delete("/decisions/{decision_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_decision(
+    decision_id: str,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> Response:
+    decision = decision_crud.get(db, decision_id)
+    if decision is None:
+        raise HTTPException(status_code=404, detail="Decision not found")
+    meeting = meeting_crud.get(db, decision.meeting_id)
+    if meeting is None:
+        raise HTTPException(status_code=404, detail="Meeting not found")
+    _assert_member(db, meeting.workspace_id, user)
+
+    decision_crud.delete(db, decision_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.post("/meetings/{meeting_id}/audio", response_model=MeetingOut)

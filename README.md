@@ -11,7 +11,9 @@ SyncForge AI bridges the gap between discussions and execution. Instead of meeti
 | Feature | Description |
 |---|---|
 | **AI Meeting Intelligence** | Upload audio/meetings and get transcripts with speaker timestamps, summaries, key decisions, action items, risks and unanswered questions. Supports English + Hinglish. |
-| **Smart Action Tracker** | Auto-generated tasks linked to their source meeting. Kanban board (To Do, In Progress, Review, Done) with assignees, priorities, due dates and overdue alerts. |
+| **Editable AI Output** | Human-in-the-loop: edit the summary, key points, risks, questions and every decision inline — or add/delete decisions the AI missed. Nothing is locked. |
+| **Smart Action Tracker** | Auto-generated tasks linked to their source meeting. Kanban board with drag & drop, assignees (avatars), priorities, due dates, overdue alerts and filters (search, assignee, priority, due date, "My tasks"). |
+| **Team & Meetings History** | Add teammates by email (owner/admin), assign work to them, and keep a searchable meeting history with an archive. |
 | **Meeting-to-Code Agent** | Converts meeting decisions into technical requirements, breaks them into subtasks, identifies relevant files and proposes code changes as diffs with human approval. |
 | **AI Dev Studio** | Browser-based coding workspace with Monaco Editor, File Explorer, context-aware AI Chat (aware of Meeting + Task + Codebase) and diff viewer. |
 | **GitHub Integration** | Connect repositories and have AI propose changes via Pull Requests (write access never auto-granted, human approval is mandatory). |
@@ -26,7 +28,7 @@ SyncForge AI bridges the gap between discussions and execution. Instead of meeti
 | **Frontend** | [Next.js 15](https://nextjs.org/) (App Router), TypeScript, [Tailwind CSS](https://tailwindcss.com/), [shadcn/ui](https://ui.shadcn.com/), [Monaco Editor](https://microsoft.github.io/monaco-editor/) | Modern, type-safe UI |
 | **Backend** | [FastAPI](https://fastapi.tiangolo.com/) (Python 3.11+) | High-performance API |
 | **Database** | **SQLite** (zero-setup dev) → [PostgreSQL](https://www.postgresql.org/) + [pgvector](https://github.com/pgvector/pgvector) (production) | Swap with `DATABASE_URL` |
-| **Auth** | JWT (bcrypt) issued by the FastAPI | Phase 1 — OAuth via Auth.js lands with Phase 2 |
+| **Auth** | JWT (bcrypt) issued by the FastAPI | Phase 1 — OAuth via Auth.js lands later |
 | **STT** | [faster-whisper](https://github.com/SYSTRAN/faster-whisper) (local, free) or [Groq Whisper](https://groq.com/) | Local = 0 cost, Cloud = faster fallback |
 | **LLMs** | [Ollama](https://ollama.com/) (Llama 3.1, Qwen 2.5 Coder) + [OpenRouter](https://openrouter.ai/) fallback + **offline extractive fallback** | Free-first; works with *no* AI service |
 | **Queue/Worker** | [Celery](https://docs.celeryq.dev/) + [Redis](https://redis.io/) | Background jobs (transcription, agent runs) |
@@ -59,12 +61,12 @@ Saumya/
 | Phase | Timeline | Goal |
 |---|---|---|
 | **Phase 1** | Day 1–2 | Scaffold + DB + Auth + Audio Upload + STT + AI Summary + Decisions/Action Items |
-| **Phase 2** | Day 3–4 | Kanban Board + Meeting→Task Linking + Editable AI Outputs + Meeting History |
+| **Phase 2** | Day 3–4 | Kanban Board + Meeting→Task Linking + Editable AI Outputs + Meeting History + Team members/assignees |
 | **Phase 3** | Day 5–6 | AI Dev Studio (Monaco + File Explorer + Context-Aware AI Chat) |
 | **Phase 4** | Day 7–8 | GitHub Integration + Meeting-to-Code Agent + Diffs + PR Proposals + Human Approval Flow |
 | **Phase 5** | Day 9–10 | Sandbox Testing + Project Memory (RAG) + Polish UI + Demo Prep |
 
-## ✅ Status — Phase 1 is built and running
+## ✅ Status — Phases 1 & 2 are built and running
 
 | Area | State |
 |---|---|
@@ -76,9 +78,14 @@ Saumya/
 | Offline extractive fallback (no LLM needed) | ✅ Working |
 | Kanban board (drag & drop, priorities, due dates) | ✅ Working |
 | Meeting Room split view (transcript ⇄ insights) | ✅ Working |
+| **Editable AI output** (summary, lists, decisions CRUD) | ✅ Working |
+| **Team members** (add by email, roles, remove) + assignees/avatars | ✅ Working |
+| **Task filters** (search, assignee/My tasks, priority, due date) | ✅ Working |
+| **Meeting history + archive + search** | ✅ Working |
 | Dev Studio, meeting→code agent, GitHub PRs, sandbox | 🗺 Phase 3–4 |
 
-**Test suites: 130 checks, all passing** — `smoke`, `normalize`, `fallback`, `pipeline`, `fallback_pipeline`.
+**Test suites: 168 checks, all passing** — `smoke`, `normalize`, `fallback`, `pipeline`, `fallback_pipeline`, `team`.
+Live HTTP verification: `verify_live_stack.py` (11/11) and `verify_live_phase2.py` (16/16).
 
 ## 🚦 Quickstart
 
@@ -121,7 +128,8 @@ cd apps\api
 Optional deeper checks:
 
 ```powershell
-.\venv\Scripts\python.exe tests\verify_live_stack.py              # live HTTP contract
+.\venv\Scripts\python.exe tests\verify_live_stack.py              # live HTTP contract (Phase 1)
+.\venv\Scripts\python.exe tests\verify_live_phase2.py            # live HTTP contract (Phase 2: team/filters/edit)
 .\venv\Scripts\python.exe tests\test_stt_live.py                  # real Whisper run (downloads ~75 MB)
 .\venv\Scripts\python.exe tests\verify_live_e2e.py                # full live pipeline (needs API running)
 .\venv\Scripts\python.exe tests\make_sample_audio.ps1             # generate sample-meeting.wav via Windows TTS
