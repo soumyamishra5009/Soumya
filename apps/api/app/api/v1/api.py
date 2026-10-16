@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from app.api.v1 import auth, workspaces, meetings, tasks, code, ship, agent
+from app.api.v1 import auth, workspaces, meetings, tasks, code, ship, agent, verify, memory
 
 api_router = APIRouter()
 
@@ -11,6 +11,8 @@ api_router.include_router(tasks.router, prefix="")
 api_router.include_router(code.router, prefix="")
 api_router.include_router(ship.router, prefix="")
 api_router.include_router(agent.router, prefix="")
+api_router.include_router(verify.router, prefix="")
+api_router.include_router(memory.router, prefix="")
 
 # Planned (Phase 5+): memory (project RAG)
 # api_router.include_router(memory.router, prefix="/memory", tags=["memory"])

@@ -33,7 +33,7 @@
 
 ## Core Pipeline: Meeting → Code
 
-Status legend: **✅ live** · **🗺 planned (Phase 5)**
+Status legend: **✅ live** · **🗺 planned**
 
 1. **Upload** — User uploads audio/video to `/meetings/{id}/upload`. ✅
 2. **Transcribe** — `faster-whisper` produces timed segments + speaker labels. ✅
@@ -41,8 +41,9 @@ Status legend: **✅ live** · **🗺 planned (Phase 5)**
 4. **Track** — Action items become `Task` rows linked to the `Meeting` (traceability). ✅
 5. **Plan** — Meeting-to-Code Agent converts a `Decision` into technical requirements + subtasks + affected files, then into `CodeProposal`s. ✅
 6. **Change** — The Dev Studio proposes full-file edits as `CodeProposal` rows (with rationale + a Monaco diff) — never auto-commits. ✅
-7. **Verify** — Sandbox runs generated tests; results attached to the run. 🗺 (the sample project ships a failing test to demonstrate this step)
+7. **Verify** — Sandboxed test runs execute the workspace's tests inside the Dev Studio sandbox (bundled offline runner, fail → fix → pass). ✅
 8. **Ship** — Human approves; the change is written, then a real branch/commit is created and a PR is opened (local git or GitHub). ✅
+9. **Remember** — Project Memory indexes meetings, decisions, tasks and code for semantic search (offline embeddings). ✅
 
 ## Meeting → Code Agent (Phase 4)
 
@@ -99,11 +100,31 @@ message and the local provider keeps working.
 - Repositories are read-only by default; write access is scoped to PR proposals.
 - All agent runs are logged with inputs, tool calls and outputs (audit trail).
 
-## RAG / Project Memory
+## RAG / Project Memory (Phase 5)
 
-- Chunks from transcripts, documents and code files are embedded (`nomic-embed-text`, 768-dim) and stored in pgvector.
-- Queries retrieve top-k chunks with similarity ≥ `SIMILARITY_THRESHOLD`.
-- Answers always cite the source (meeting timestamp or file/line range).
+- Chunks from meetings, decisions, tasks and sandbox code files are embedded and stored
+  as JSON vectors in `memory_chunks` (SQLite dev default; pgvector-ready for prod).
+- **Offline embeddings** use a deterministic hashing trick (word unigrams + char trigrams,
+  L2-normalised, `MEMORY_EMBED_DIM=256`) so search works with no embedding server.
+  When Ollama is reachable, real `nomic-embed-text` vectors are used instead (`source="llm"`).
+- Queries retrieve top-k chunks with cosine similarity ≥ `MEMORY_MIN_SCORE`.
+- Re-indexing is idempotent: unchanged chunks (by sha256) are skipped; stale chunks
+  from deleted sources are removed.
+- The UI labels offline results honestly (`source="fallback"`).
+
+## Sandboxed Test Runs (Phase 5)
+
+- `testrunner.py` executes a workspace's tests inside its Dev Studio sandbox as a plain
+  subprocess — no Docker, no Judge0, no network.
+- A **bundled dependency-free runner** collects `test_*` functions and
+  `unittest.TestCase` classes, runs them and prints a machine-readable summary.
+  This is the offline default so the feature works on a bare machine.
+- When pytest is importable (`EXEC_PREFER_PYTEST=true`), it is used instead.
+- Hard rules: arguments are always passed as a list (never through a shell); the child
+  gets a **whitelisted** environment so workspace code can never read the API's secrets;
+  a wall-clock timeout kills the run; output is captured, bounded and returned.
+- `TestRun` rows record the outcome (passed/failed/error/timeout), counts, duration,
+  command and output — the evidence a human reviews before shipping.
 
 ## Model Routing (Cost-Aware)
 
@@ -289,6 +310,24 @@ never persisted.
 Referencing a not-yet-approved proposal when creating a PR returns `409`; opening
 a proposal whose sandbox drifted returns `502` and the proposal is persisted as
 `failed` with the reason.
+
+## API Surface — Phase 5 (Verify & Remember)
+
+| Method | Path | Purpose |
+|---|---|---|
+| `POST` | `/api/v1/workspaces/{id}/tests/run` | Execute the workspace's tests in the sandbox |
+| `GET` | `/api/v1/workspaces/{id}/tests` | List runs (filter by `status`) |
+| `GET` | `/api/v1/workspaces/{id}/tests/latest` | Most recent run |
+| `GET`/`DELETE` | `/api/v1/workspaces/{id}/tests/{rid}` | Fetch / delete a run |
+| `POST` | `/api/v1/workspaces/{id}/memory/index` | (Re)index meetings, decisions, tasks and code |
+| `POST` | `/api/v1/workspaces/{id}/memory/search` | Semantic search across the index |
+| `GET` | `/api/v1/workspaces/{id}/memory/stats` | Chunk counts, dims, embed sources |
+| `GET` | `/api/v1/workspaces/{id}/memory/chunks` | List chunks (filter by `type`) |
+| `DELETE` | `/api/v1/workspaces/{id}/memory/chunks/{cid}` | Delete one chunk |
+| `DELETE` | `/api/v1/workspaces/{id}/memory` | Clear the index (optionally by `type`) |
+
+Test runs return `400` for an empty sandbox, a traversal/`.git` target, or an
+undetectable test setup. Memory search returns `400` for a blank query.
 
 ## API Auth & Media
 

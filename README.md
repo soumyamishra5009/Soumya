@@ -67,7 +67,7 @@ Saumya/
 | **Phase 4** | Day 7–8 | GitHub Integration + Meeting-to-Code Agent + Diffs + PR Proposals + Human Approval Flow |
 | **Phase 5** | Day 9–10 | Sandbox Testing + Project Memory (RAG) + Polish UI + Demo Prep |
 
-## ✅ Status — Phases 1, 2, 3 & 4 are built and running
+## ✅ Status — Phases 1, 2, 3, 4 & 5 are built and running
 
 | Area | State |
 |---|---|
@@ -94,10 +94,11 @@ Saumya/
 | **Repository connections** (offline local sandbox + GitHub metadata) | ✅ Working |
 | **Pull-request proposals** (draft snapshot → open commit → merge / close) | ✅ Working |
 | **GitHub push** (blobs → tree → commit → pull request via REST) | ✅ Gated on `GITHUB_TOKEN` |
-| Sandbox test runs, Project Memory (RAG) | 🗺 Phase 5 |
+| **Sandbox test runs** (bundled offline runner, fail → fix → pass) | ✅ Working |
+| **Project Memory (RAG)** (offline embeddings, index → search → clear) | ✅ Working |
 
-**Test suites: 303 checks, all passing** — `smoke`, `normalize`, `fallback`, `pipeline`, `fallback_pipeline`, `team`, `studio`, `ship`.
-Live HTTP verification: `verify_live_stack.py` (11/11), `verify_live_phase2.py` (16/16), `verify_live_phase3.py` (21/21) and `verify_live_phase4.py` (26/26).
+**Test suites: 414 checks, all passing** — `smoke`, `normalize`, `fallback`, `pipeline`, `fallback_pipeline`, `team`, `studio`, `ship`, `verify`, `memory`.
+Live HTTP verification: `verify_live_stack.py` (11/11), `verify_live_phase2.py` (16/16), `verify_live_phase3.py` (21/21), `verify_live_phase4.py` (26/26) and `verify_live_phase5.py` (26/26).
 
 ## 🚦 Quickstart
 
@@ -162,6 +163,7 @@ Optional deeper checks:
 .\venv\Scripts\python.exe tests\verify_live_phase2.py            # live HTTP contract (Phase 2: team/filters/edit)
 .\venv\Scripts\python.exe tests\verify_live_phase3.py            # live HTTP contract (Phase 3: studio files/chat/proposals)
 .\venv\Scripts\python.exe tests\verify_live_phase4.py            # live HTTP contract (Phase 4: git, PR proposals, agent)
+.\venv\Scripts\python.exe tests\verify_live_phase5.py            # live HTTP contract (Phase 5: test runs, memory RAG)
 .\venv\Scripts\python.exe tests\test_stt_live.py                  # real Whisper run (downloads ~75 MB)
 .\venv\Scripts\python.exe tests\verify_live_e2e.py                # full live pipeline (needs API running)
 .\venv\Scripts\python.exe tests\make_sample_audio.ps1             # generate sample-meeting.wav via Windows TTS

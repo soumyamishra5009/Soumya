@@ -18,6 +18,8 @@ TESTS = [
     "tests/test_team.py",
     "tests/test_studio.py",
     "tests/test_ship.py",
+    "tests/test_verify.py",
+    "tests/test_memory.py",
 ]
 
 try:

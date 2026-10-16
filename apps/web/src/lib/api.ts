@@ -15,6 +15,10 @@ import type {
   Meeting,
   MeetingSummary,
   MeetingWithDetails,
+  MemoryHit,
+  MemoryIndexResult,
+  MemorySearchResult,
+  MemoryStats,
   PlanApply,
   ProposalDecision,
   PullRequest,
@@ -28,6 +32,8 @@ import type {
   Task,
   TaskPriority,
   TaskStatus,
+  TestRun,
+  TestRunRequest,
   TokenResponse,
   Transcript,
   User,
@@ -547,6 +553,69 @@ export const api = {
       { method: "POST" }
     );
   },
+
+  // ---- verify: sandboxed test runs (Phase 5) ----
+  runTests(workspaceId: string, input: TestRunRequest = {}) {
+    return request<TestRun>(`/api/v1/workspaces/${workspaceId}/tests/run`, {
+      method: "POST",
+      body: JSON.stringify(input),
+    });
+  },
+  listTestRuns(workspaceId: string, status?: string) {
+    const qs = status ? `?status=${encodeURIComponent(status)}` : "";
+    return request<TestRun[]>(`/api/v1/workspaces/${workspaceId}/tests${qs}`);
+  },
+  latestTestRun(workspaceId: string) {
+    return request<TestRun>(`/api/v1/workspaces/${workspaceId}/tests/latest`);
+  },
+
+  // ---- project memory: workspace RAG (Phase 5) ----
+  memoryStats(workspaceId: string) {
+    return request<MemoryStats>(`/api/v1/workspaces/${workspaceId}/memory/stats`);
+  },
+  indexMemory(
+    workspaceId: string,
+    input: { include_code?: boolean; force?: boolean } = {}
+  ) {
+    return request<MemoryIndexResult>(
+      `/api/v1/workspaces/${workspaceId}/memory/index`,
+      { method: "POST", body: JSON.stringify(input) }
+    );
+  },
+  searchMemory(
+    workspaceId: string,
+    input: { query: string; k?: number; types?: string[] }
+  ) {
+    return request<MemorySearchResult>(
+      `/api/v1/workspaces/${workspaceId}/memory/search`,
+      { method: "POST", body: JSON.stringify(input) }
+    );
+  },
+  listMemoryChunks(
+    workspaceId: string,
+    opts: { type?: string; limit?: number } = {}
+  ) {
+    const params = new URLSearchParams();
+    if (opts.type) params.set("type", opts.type);
+    if (opts.limit) params.set("limit", String(opts.limit));
+    const qs = params.toString() ? `?${params.toString()}` : "";
+    return request<MemoryHit[]>(
+      `/api/v1/workspaces/${workspaceId}/memory/chunks${qs}`
+    );
+  },
+  deleteMemoryChunk(workspaceId: string, chunkId: string) {
+    return request<void>(
+      `/api/v1/workspaces/${workspaceId}/memory/chunks/${chunkId}`,
+      { method: "DELETE" }
+    );
+  },
+  clearMemory(workspaceId: string, type?: string) {
+    const qs = type ? `?type=${encodeURIComponent(type)}` : "";
+    return request<{ removed: number; message: string }>(
+      `/api/v1/workspaces/${workspaceId}/memory${qs}`,
+      { method: "DELETE" }
+    );
+  },
 };
 
 // Sandbox paths are POSIX-relative and may contain nested directories; encode
@@ -573,6 +642,10 @@ export type {
   MeetingSummary,
   MeetingWithDetails,
   Member,
+  MemoryHit,
+  MemoryIndexResult,
+  MemorySearchResult,
+  MemoryStats,
   PlanApply,
   PlanChange,
   PlanFile,

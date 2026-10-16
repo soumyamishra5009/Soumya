@@ -13,6 +13,8 @@ from app.models.enums import (  # noqa: F401
     RepoProvider,
     PullRequestStatus,
     PlanStatus,
+    TestRunStatus,
+    MemorySourceType,
 )
 from app.models.user import User, Account  # noqa: F401
 from app.models.workspace import Workspace, WorkspaceMember  # noqa: F401
@@ -24,6 +26,8 @@ from app.models.ship import (  # noqa: F401
     CodePlan,
     PullRequestProposal,
 )
+from app.models.verify import TestRun  # noqa: F401
+from app.models.memory import MemoryChunk  # noqa: F401
 
 __all__ = [
     "Base",
@@ -38,6 +42,8 @@ __all__ = [
     "RepoProvider",
     "PullRequestStatus",
     "PlanStatus",
+    "TestRunStatus",
+    "MemorySourceType",
     "User",
     "Account",
     "Workspace",
@@ -51,4 +57,6 @@ __all__ = [
     "RepoConnection",
     "CodePlan",
     "PullRequestProposal",
+    "TestRun",
+    "MemoryChunk",
 ]

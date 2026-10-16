@@ -47,6 +47,12 @@ class Workspace(Base):
     pull_requests = relationship(
         "PullRequestProposal", back_populates="workspace", cascade="all, delete-orphan"
     )
+    test_runs = relationship(
+        "TestRun", back_populates="workspace", cascade="all, delete-orphan"
+    )
+    memory_chunks = relationship(
+        "MemoryChunk", back_populates="workspace", cascade="all, delete-orphan"
+    )
 
     def __repr__(self) -> str:
         return f"<Workspace {self.slug}>"

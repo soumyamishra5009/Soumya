@@ -397,3 +397,85 @@ export interface PlanApply {
   skipped: string[];
   message: string;
 }
+
+// ---------------------------------------------------------------------------
+// Verify (Phase 5): sandboxed test runs
+// ---------------------------------------------------------------------------
+
+export type TestRunKind = "auto" | "python" | "node";
+
+export type TestRunStatus = "passed" | "failed" | "error" | "timeout";
+
+export interface TestRun {
+  id: string;
+  workspace_id: string;
+  kind: TestRunKind;
+  runner: string; // "builtin" | "pytest" | "node"
+  command: string;
+  target: string | null;
+  status: TestRunStatus;
+  exit_code: number | null;
+  passed: number;
+  failed: number;
+  errors: number;
+  duration_ms: number;
+  output: string;
+  output_truncated: boolean;
+  source: string; // "local" | "judge0"
+  created_by: string | null;
+  created_at: string;
+  summary: string;
+}
+
+export interface TestRunRequest {
+  kind?: TestRunKind;
+  target?: string | null;
+  timeout?: number | null;
+}
+
+// ---------------------------------------------------------------------------
+// Project Memory (Phase 5): workspace RAG
+// ---------------------------------------------------------------------------
+
+export type MemorySourceType = "meeting" | "decision" | "task" | "file" | "note";
+
+export interface MemoryIndexResult {
+  indexed: number;
+  created: number;
+  skipped: number;
+  removed: number;
+  chunks: number;
+  by_type: Record<string, number>;
+  source: string; // "llm" | "fallback"
+  dim: number;
+  message: string;
+}
+
+export interface MemoryHit {
+  chunk_id: string;
+  source_type: MemorySourceType;
+  source_id: string;
+  title: string;
+  score: number;
+  snippet: string;
+  meta: Record<string, unknown>;
+}
+
+export interface MemorySearchResult {
+  query: string;
+  count: number;
+  results: MemoryHit[];
+  source: string;
+  dim: number;
+  indexed: number;
+  min_score: number;
+  message: string;
+}
+
+export interface MemoryStats {
+  chunks: number;
+  by_type: Record<string, number>;
+  dims: number[];
+  embed_sources: string[];
+  max_chunks: number;
+}

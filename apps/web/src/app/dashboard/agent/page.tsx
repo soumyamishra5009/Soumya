@@ -7,16 +7,19 @@ import {
   Bot,
   Check,
   Code2,
+  FlaskConical,
   GitBranch,
   GitCommitVertical,
   GitMerge,
   GitPullRequest,
   Loader2,
+  Play,
   Plus,
   RefreshCw,
   Rocket,
   Sparkles,
   Trash2,
+  Terminal,
   TriangleAlert,
   X,
 } from "lucide-react";
@@ -33,6 +36,7 @@ import type {
   Meeting,
   PullRequest,
   RepoConnection,
+  TestRun,
 } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -56,6 +60,16 @@ const PR_VARIANT: Record<
   merged: "success",
   closed: "secondary",
   failed: "destructive",
+};
+
+const RUN_VARIANT: Record<
+  TestRun["status"],
+  "default" | "secondary" | "success" | "warning" | "destructive" | "info" | "outline"
+> = {
+  passed: "success",
+  failed: "destructive",
+  error: "warning",
+  timeout: "warning",
 };
 
 const KIND_VARIANT: Record<string, "info" | "warning" | "success" | "outline"> = {
@@ -90,6 +104,11 @@ export default function AgentPage() {
   const [shipOnlyPlan, setShipOnlyPlan] = React.useState(true);
   const [busy, setBusy] = React.useState(false);
 
+  const [runs, setRuns] = React.useState<TestRun[]>([]);
+  const [latest, setLatest] = React.useState<TestRun | null>(null);
+  const [runBusy, setRunBusy] = React.useState(false);
+  const [runTarget, setRunTarget] = React.useState("");
+
   const loadShip = React.useCallback(async () => {
     if (!workspaceId) return;
     try {
@@ -103,6 +122,17 @@ export default function AgentPage() {
       setCommits(log);
     } catch (err) {
       toast.error(errMessage(err, "Could not load the ship state"));
+    }
+  }, [workspaceId]);
+
+  const loadRuns = React.useCallback(async () => {
+    if (!workspaceId) return;
+    try {
+      const list = await api.listTestRuns(workspaceId, undefined);
+      setRuns(list);
+      setLatest(list[0] ?? null);
+    } catch {
+      /* non-fatal */
     }
   }, [workspaceId]);
 
@@ -130,6 +160,7 @@ export default function AgentPage() {
     })();
     void loadRepos();
     void loadShip();
+    void loadRuns();
     return () => {
       cancelled = true;
     };
@@ -195,6 +226,30 @@ export default function AgentPage() {
       await loadShip();
     } catch (err) {
       toast.error(errMessage(err, "Could not record the decision"));
+    }
+  };
+
+  const runTests = async () => {
+    if (!workspaceId) return;
+    setRunBusy(true);
+    try {
+      const result = await api.runTests(workspaceId, {
+        target: runTarget.trim() || undefined,
+      });
+      setLatest(result);
+      setRuns((prev) => [result, ...prev]);
+      if (result.status === "passed") {
+        toast.success(result.summary);
+      } else if (result.status === "failed") {
+        toast.error(result.summary);
+      } else {
+        toast.message(result.summary);
+      }
+      await loadShip();
+    } catch (err) {
+      toast.error(errMessage(err, "Could not run the tests"));
+    } finally {
+      setRunBusy(false);
     }
   };
 
@@ -800,6 +855,108 @@ export default function AgentPage() {
             </CardContent>
           </Card>
         )}
+
+        {/* verify: sandboxed test runs */}
+        <Card>
+          <CardHeader className="flex-row items-center justify-between space-y-0">
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <FlaskConical className="h-5 w-5 text-primary" />
+              Verify — sandboxed tests
+            </CardTitle>
+            <Badge variant="outline">Phase 5</Badge>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Run the workspace&apos;s tests inside the Dev Studio sandbox before
+              shipping. The runner is bundled and works fully offline; nothing
+              leaves the sandbox.
+            </p>
+
+            <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-muted-foreground">
+                  Target (optional)
+                </label>
+                <Input
+                  value={runTarget}
+                  onChange={(e) => setRunTarget(e.target.value)}
+                  placeholder="e.g. tests/test_calculator.py"
+                />
+              </div>
+              <div className="flex items-end">
+                <Button onClick={runTests} disabled={runBusy}>
+                  {runBusy ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Play className="h-4 w-4" />
+                  )}
+                  Run tests
+                </Button>
+              </div>
+            </div>
+
+            {latest && (
+              <div className="space-y-3 rounded-md border bg-muted/30 p-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge variant={RUN_VARIANT[latest.status]}>
+                    {latest.status}
+                  </Badge>
+                  <span className="text-sm font-medium">{latest.summary}</span>
+                  <span className="ml-auto text-xs text-muted-foreground">
+                    {latest.runner} · {latest.duration_ms} ms · {latest.passed}/
+                    {latest.failed}/{latest.errors}
+                  </span>
+                </div>
+                {latest.output && (
+                  <details>
+                    <summary className="flex cursor-pointer items-center gap-1 text-xs font-medium text-muted-foreground">
+                      <Terminal className="h-3.5 w-3.5" />
+                      Show output
+                    </summary>
+                    <pre className="mt-2 max-h-64 overflow-auto rounded border bg-background p-2 text-xs">
+                      {latest.output}
+                    </pre>
+                  </details>
+                )}
+              </div>
+            )}
+
+            {runs.length > 0 && (
+              <div className="space-y-1">
+                <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Recent runs
+                </h3>
+                <ul className="space-y-1">
+                  {runs.slice(0, 5).map((r) => (
+                    <li
+                      key={r.id}
+                      className="flex items-center gap-2 rounded px-1 py-0.5 text-sm hover:bg-muted/40"
+                    >
+                      <span
+                        className={cn(
+                          "h-1.5 w-1.5 rounded-full",
+                          r.status === "passed" && "bg-emerald-500",
+                          r.status === "failed" && "bg-rose-500",
+                          (r.status === "error" || r.status === "timeout") &&
+                            "bg-amber-500"
+                        )}
+                      />
+                      <span className="font-mono text-xs text-muted-foreground">
+                        {new Date(r.created_at).toLocaleTimeString()}
+                      </span>
+                      <span className="flex-1 truncate text-xs text-muted-foreground">
+                        {r.command}
+                      </span>
+                      <span className="text-xs">
+                        {r.passed}✓ / {r.failed}✗
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

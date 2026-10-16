@@ -89,3 +89,26 @@ class PlanStatus(str, enum.Enum):
 
     DRAFT = "draft"
     APPLIED = "applied"
+
+
+class TestRunStatus(str, enum.Enum):
+    """Outcome of a sandboxed test run.
+
+    ``error`` means the runner itself could not complete (collection error,
+    missing interpreter); ``timeout`` means it was killed at the limit.
+    """
+
+    PASSED = "passed"
+    FAILED = "failed"
+    ERROR = "error"
+    TIMEOUT = "timeout"
+
+
+class MemorySourceType(str, enum.Enum):
+    """What a Project Memory chunk was derived from."""
+
+    MEETING = "meeting"
+    DECISION = "decision"
+    TASK = "task"
+    FILE = "file"
+    NOTE = "note"

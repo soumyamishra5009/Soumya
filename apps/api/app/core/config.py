@@ -75,17 +75,33 @@ class Settings(BaseSettings):
     # How many characters of a file to include as context for the AI chat.
     DEVSTUDIO_CONTEXT_CHARS: int = 12000
     
-    # Code Execution
-    CODE_EXECUTOR: str = "judge0"
+    # Code Execution (Phase 5: sandboxed test runs).
+    # "local" runs the tests as a subprocess inside the Dev Studio sandbox with a
+    # hard timeout (works offline, needs no Docker). "judge0" delegates to a
+    # Judge0-compatible service when one is reachable.
+    CODE_EXECUTOR: str = "local"
     JUDGE0_BASE_URL: str = "http://localhost:2358"
     JUDGE0_API_KEY: str = ""
     E2B_API_KEY: str = ""
     EXEC_TIMEOUT_SECONDS: int = 30
     EXEC_MAX_MEMORY_MB: int = 512
-    
-    # Vector Search
+    # How much captured output to persist per run, and whether to prefer pytest
+    # over the bundled dependency-free runner when pytest is importable.
+    EXEC_MAX_OUTPUT_CHARS: int = 20000
+    EXEC_PREFER_PYTEST: bool = True
+
+    # Vector Search / Project Memory (Phase 5: workspace RAG).
     VECTOR_DIMENSION: int = 768
     SIMILARITY_THRESHOLD: float = 0.7
+    # Deterministic offline embeddings (hashing trick) so memory search works with
+    # no embedding server; a real model's vectors are stored at their own dim.
+    MEMORY_EMBED_DIM: int = 256
+    MEMORY_CHUNK_CHARS: int = 1200
+    MEMORY_CHUNK_OVERLAP: int = 150
+    MEMORY_TOP_K: int = 8
+    MEMORY_MAX_CHUNKS: int = 5000
+    MEMORY_INDEX_MAX_FILES: int = 200
+    MEMORY_MIN_SCORE: float = 0.05
     
     # GitHub
     GITHUB_CLIENT_ID: str = ""

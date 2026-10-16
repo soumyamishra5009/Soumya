@@ -14,6 +14,7 @@ import {
   Loader2,
   Sparkles,
   ChevronDown,
+  Brain,
 } from "lucide-react";
 
 import { AuthProvider, useAuth } from "@/components/auth-provider";
@@ -30,6 +31,7 @@ const NAV = [
   { href: "/dashboard/team", label: "Team", icon: Users, ready: true },
   { href: "/dashboard/studio", label: "Dev Studio", icon: Code2, ready: true },
   { href: "/dashboard/agent", label: "Meeting → Code", icon: GitPullRequest, ready: true },
+  { href: "/dashboard/memory", label: "Project Memory", icon: Brain, ready: true },
 ];
 
 function Shell({ children }: { children: ReactNode }) {
