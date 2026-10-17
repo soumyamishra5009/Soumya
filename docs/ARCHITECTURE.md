@@ -19,7 +19,7 @@
         ▼               ▼               ▼               ▼               ▼
    ┌─────────┐    ┌──────────┐    ┌───────────┐   ┌──────────┐   ┌──────────┐
    │  STT    │    │   LLM    │    │   RAG     │   │  GitHub  │   │ Sandbox  │
-   │ Whisper │    │ Ollama / │    │ pgvector  │   │   API    │   │  Judge0  │
+   │ Whisper │    │ Gemini / │    │ pgvector  │   │   API    │   │  Judge0  │
    │  local  │    │OpenRouter│    │  search   │   │  PR/diff │   │   /E2B   │
    └─────────┘    └──────────┘    └───────────┘   └──────────┘   └──────────┘
         │               │               │               │               │
@@ -106,7 +106,8 @@ message and the local provider keeps working.
   as JSON vectors in `memory_chunks` (SQLite dev default; pgvector-ready for prod).
 - **Offline embeddings** use a deterministic hashing trick (word unigrams + char trigrams,
   L2-normalised, `MEMORY_EMBED_DIM=256`) so search works with no embedding server.
-  When Ollama is reachable, real `nomic-embed-text` vectors are used instead (`source="llm"`).
+  When **Gemini** (`text-embedding-004`) or Ollama (`nomic-embed-text`) is reachable,
+  real vectors are used instead (`source="llm"`).
 - Queries retrieve top-k chunks with cosine similarity ≥ `MEMORY_MIN_SCORE`.
 - Re-indexing is idempotent: unchanged chunks (by sha256) are skipped; stale chunks
   from deleted sources are removed.
@@ -144,12 +145,16 @@ paid service or a machine you don't control.
 
 ### Analysis ladder (`extract_meeting_intelligence`)
 
-1. **Ollama (local)** — primary, free, `OLLAMA_BASE_URL`.
-2. **OpenRouter** — cloud fallback if `OPENROUTER_API_KEY` is set.
-3. **Offline extractive fallback** — heuristic analysis with no LLM at all.
+1. **Google Gemini (cloud)** — primary when `GEMINI_API_KEY` is set. Free tier,
+   OpenAI-compatible, nothing installed locally — this is what live deploys use.
+2. **OpenRouter (cloud)** — fallback if `OPENROUTER_API_KEY` is set.
+3. **Ollama (local)** — offline last resort, `OLLAMA_BASE_URL`, no key needed.
+4. **Offline extractive fallback** — heuristic analysis with no LLM at all.
 
-If step 1/2 fails and `ALLOW_EXTRACTIVE_FALLBACK=true` (default), the extractor
-switches to `fallback_extract()` in `app/services/meeting_summary.py`:
+Order is configurable with `LLM_PROVIDER_ORDER` (default `gemini,openrouter,ollama`).
+
+If every provider fails and `ALLOW_EXTRACTIVE_FALLBACK=true` (default), the
+extractor switches to `fallback_extract()` in `app/services/meeting_summary.py`:
 
 - sentence splitting → content-word frequency scoring for key points
 - cue-based classification for decisions / actions / risks / questions (English **and Hinglish**)
@@ -169,8 +174,8 @@ instead (the meeting is marked `failed` with the reason surfaced).
 
 ### Dev Studio ladder (`devstudio.ai_code_answer` / `ai_code_proposal`)
 
-1. **LLM** — Ollama first, then OpenRouter (`chat_completion` for Q&A,
-   `structured_completion` for proposals). Results are labelled `source="llm"`.
+1. **LLM** — the provider ladder: Gemini → OpenRouter → Ollama (`chat_completion`
+   for Q&A, `structured_completion` for proposals). Results are labelled `source="llm"`.
 2. **Offline deterministic fallback** — a code-aware analyser: structural overview
    (imports/classes/functions), TODO/FIXME scan, a small static linter (bare
    `except`, `== None`, mutable defaults, `eval`/`exec`, `==` in JS, long lines…),
@@ -182,7 +187,7 @@ instead (the meeting is marked `failed` with the reason surfaced).
 
 The same three rungs as everything else:
 
-1. **LLM** — `structured_completion` with `AGENT_MODEL` (Ollama → OpenRouter).
+1. **LLM** — `structured_completion` with `AGENT_MODEL` (Gemini → OpenRouter → Ollama).
    The model may only reference files that exist in the tree; hallucinated paths
    are dropped in `_coerce_plan` before the plan is stored.
 2. **Offline deterministic planner** — keyword scoring against the file tree (no
@@ -213,7 +218,7 @@ identical path-safety, size and hashing rules.
 | Database | `sqlite:///./syncforge.db` | Postgres + `pgvector` via `DATABASE_URL` |
 | Background jobs | FastAPI `BackgroundTasks` | Celery + Redis |
 | Storage | `./uploads` local disk | Supabase/S3-compatible |
-| LLM | Offline fallback or local Ollama | Ollama or OpenRouter |
+| LLM | Offline fallback or local Ollama | Gemini (cloud) or OpenRouter; Ollama optional |
 | STT | faster-whisper local | faster-whisper or Groq |
 | Dev Studio files | `./devstudio/<workspace_id>/` on local disk | Mounted volume / object store |
 | Ship provider | `local` git repo in the sandbox (offline) | `github` via REST + `GITHUB_TOKEN` |

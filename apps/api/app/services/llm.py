@@ -1,8 +1,13 @@
 """LLM client with structured JSON output.
 
-Providers:
-- Ollama (primary, free/local) via the OpenAI-compatible endpoint
-- OpenRouter (fallback) via OpenAI-compatible endpoint
+Provider ladder (first configured wins, Ollama is the local last resort):
+
+1. **Google Gemini** — cloud, free tier, OpenAI-compatible. Used when
+   ``GEMINI_API_KEY`` is set, so the app gets real AI with nothing to install.
+2. **OpenRouter** — cloud fallback, OpenAI-compatible (free models available).
+3. **Ollama** — fully local/offline (``OLLAMA_BASE_URL``), needs no key.
+
+The order is configurable via ``LLM_PROVIDER_ORDER``.
 
 Returns parsed JSON (dict) or raises.
 """
@@ -19,15 +24,55 @@ import httpx
 
 logger = logging.getLogger(__name__)
 
+_DEFAULT_GEMINI_BASE = "https://generativelanguage.googleapis.com/v1beta/openai"
+_DEFAULT_OPENROUTER_BASE = "https://openrouter.ai/api/v1"
+_DEFAULT_OPENROUTER_MODEL = "meta-llama/llama-3.1-8b-instruct:free"
 
-def _ollama_config() -> tuple[str, str]:
+
+def _gemini_provider(model: str) -> tuple[str, str, str] | None:
+    key = os.getenv("GEMINI_API_KEY", "").strip()
+    if not key:
+        return None
+    base = os.getenv("GEMINI_BASE_URL", _DEFAULT_GEMINI_BASE).rstrip("/")
+    chosen = os.getenv("GEMINI_MODEL", "gemini-2.0-flash").strip() or "gemini-2.0-flash"
+    return base, key, chosen
+
+
+def _openrouter_provider(model: str) -> tuple[str, str, str] | None:
+    key = os.getenv("OPENROUTER_API_KEY", "").strip()
+    if not key:
+        return None
+    base = os.getenv("OPENROUTER_BASE_URL", _DEFAULT_OPENROUTER_BASE).rstrip("/")
+    chosen = os.getenv("OPENROUTER_MODEL", _DEFAULT_OPENROUTER_MODEL).strip()
+    return base, key, chosen
+
+
+def _ollama_provider(model: str) -> tuple[str, str, str] | None:
     base = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434").rstrip("/")
-    return f"{base}/v1", "ollama"
+    return f"{base}/v1", "ollama", model
 
 
-def _openrouter_config() -> tuple[str, str]:
-    base = os.getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1").rstrip("/")
-    return base, os.getenv("OPENROUTER_API_KEY", "")
+_PROVIDERS = {
+    "gemini": _gemini_provider,
+    "openrouter": _openrouter_provider,
+    "ollama": _ollama_provider,
+}
+
+
+def _provider_chain(model: str) -> list[tuple[str, str, str]]:
+    """Ordered ``(base_url, api_key, model_name)`` candidates to try."""
+    order = os.getenv("LLM_PROVIDER_ORDER", "gemini,openrouter,ollama")
+    chain: list[tuple[str, str, str]] = []
+    for name in (part.strip().lower() for part in order.split(",")):
+        if not name:
+            continue
+        builder = _PROVIDERS.get(name)
+        if builder is None:
+            continue
+        cfg = builder(model)
+        if cfg:
+            chain.append(cfg)
+    return chain
 
 
 def _chat_completion(
@@ -37,19 +82,19 @@ def _chat_completion(
     max_tokens: int = 4096,
     timeout: float = 180.0,
 ) -> str:
-    """Call Ollama first, then fall back to OpenRouter. Returns raw text."""
-    providers = [_ollama_config()]
-    if os.getenv("OPENROUTER_API_KEY"):
-        providers.append(_openrouter_config())
+    """Try each configured provider in order. Returns raw text."""
+    providers = _provider_chain(model)
+    if not providers:
+        raise RuntimeError("No LLM provider configured (set GEMINI_API_KEY)")
 
     errors: list[str] = []
-    for (base_url, api_key) in providers:
+    for (base_url, api_key, model_name) in providers:
         try:
             headers = {"Content-Type": "application/json"}
             if api_key and api_key != "ollama":
                 headers["Authorization"] = f"Bearer {api_key}"
             payload = {
-                "model": model,
+                "model": model_name,
                 "messages": messages,
                 "temperature": temperature,
                 "max_tokens": max_tokens,
@@ -66,10 +111,10 @@ def _chat_completion(
             content = data["choices"][0]["message"]["content"]
             if content:
                 return str(content)
-            errors.append(f"{base_url}: empty content")
+            errors.append(f"{model_name}: empty content")
         except Exception as exc:
-            logger.warning("LLM provider %s failed: %s", base_url, exc)
-            errors.append(f"{base_url}: {exc}")
+            logger.warning("LLM provider %s failed: %s", model_name, exc)
+            errors.append(f"{model_name}: {exc}")
 
     raise RuntimeError("All LLM providers failed -> " + " | ".join(errors))
 
@@ -145,7 +190,7 @@ def structured_completion(
     max_tokens: int = 4096,
 ) -> dict[str, Any]:
     """Request JSON from the model and parse it."""
-    model = model or os.getenv("DEFAULT_CHAT_MODEL", "llama-3.1:8b")
+    model = model or os.getenv("DEFAULT_CHAT_MODEL", "llama3.1:8b")
     messages = [
         {"role": "system", "content": system},
         {"role": "user", "content": user},
@@ -163,10 +208,10 @@ def chat_completion(
 ) -> str:
     """Free-form text completion (used by the Dev Studio assistant).
 
-    Same provider ladder as :func:`structured_completion` (Ollama first, then
-    OpenRouter) but returns the raw answer instead of parsing JSON.
+    Same provider ladder as :func:`structured_completion` but returns the raw
+    answer instead of parsing JSON.
     """
-    model = model or os.getenv("DEFAULT_CHAT_MODEL", "llama-3.1:8b")
+    model = model or os.getenv("DEFAULT_CHAT_MODEL", "llama3.1:8b")
     messages = [
         {"role": "system", "content": system},
         {"role": "user", "content": user},
@@ -174,8 +219,38 @@ def chat_completion(
     return _chat_completion(model, messages, temperature=temperature, max_tokens=max_tokens)
 
 
-def embed(texts: list[str]) -> list[list[float]]:
-    """Embed texts using Ollama's embeddings endpoint."""
+def _gemini_embeddings(texts: list[str]) -> list[list[float]] | None:
+    """Embed via Gemini's OpenAI-compatible endpoint.
+
+    Returns ``None`` when Gemini is unset *or* the call fails, so the caller can
+    try the next backend instead of aborting.
+    """
+    key = os.getenv("GEMINI_API_KEY", "").strip()
+    if not key:
+        return None
+    base = os.getenv("GEMINI_BASE_URL", _DEFAULT_GEMINI_BASE).rstrip("/")
+    model = os.getenv("GEMINI_EMBED_MODEL", "text-embedding-004")
+    try:
+        with httpx.Client(timeout=60.0) as client:
+            resp = client.post(
+                f"{base}/embeddings",
+                headers={"Authorization": f"Bearer {key}"},
+                json={"model": model, "input": list(texts)},
+            )
+        resp.raise_for_status()
+        rows = resp.json()["data"]
+        # OpenAI returns data rows possibly out of order -> sort by index.
+        rows = sorted(rows, key=lambda r: r.get("index", 0))
+        vectors = [[float(x) for x in row["embedding"]] for row in rows]
+        if len(vectors) != len(texts) or not all(vectors):
+            return None
+        return vectors
+    except Exception as exc:  # noqa: BLE001 - fall through to the next backend
+        logger.info("Gemini embeddings unavailable (%s); trying next backend", exc)
+        return None
+
+
+def _ollama_embeddings(texts: list[str]) -> list[list[float]]:
     base = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434").rstrip("/")
     model = os.getenv("EMBEDDING_MODEL", "nomic-embed-text")
     vectors: list[list[float]] = []
@@ -185,3 +260,19 @@ def embed(texts: list[str]) -> list[list[float]]:
             resp.raise_for_status()
             vectors.append(resp.json()["embedding"])
     return vectors
+
+
+def embed(texts: list[str]) -> list[list[float]]:
+    """Embed texts with the best configured backend (Gemini, then Ollama).
+
+    Raises if no backend is reachable — callers (Project Memory) fall back to a
+    deterministic offline hashing embedding.
+    """
+    if not texts:
+        return []
+
+    gemini = _gemini_embeddings(texts)
+    if gemini is not None:
+        return gemini
+
+    return _ollama_embeddings(texts)

@@ -1,0 +1,59 @@
+# Render blueprint — one-click deploy for the SyncForge AI backend.
+#
+# Frontend (Next.js) lives on Vercel; this file only describes the FastAPI
+# service. `sync: false` means "prompt me / set in the dashboard" — those are
+# the secrets and the values that depend on your own accounts.
+#
+# Deploy: Render Dashboard -> New -> Blueprint -> pick this repo.
+services:
+  - type: web
+    name: syncforge-api
+    runtime: docker
+    plan: free
+    region: oregon
+    rootDir: apps/api
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      # Postgres (Neon/Supabase free tier). Required — the free plan has no disk.
+      - key: DATABASE_URL
+        sync: false
+      # Auth secrets — Render generates strong values for you.
+      - key: SECRET_KEY
+        generateValue: true
+      - key: AUTH_SECRET
+        generateValue: true
+      # The Vercel URL(s) allowed to call this API, comma-separated.
+      - key: CORS_ORIGINS
+        sync: false
+      # Real AI with nothing installed locally.
+      - key: LLM_PROVIDER_ORDER
+        value: gemini,openrouter,ollama
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GEMINI_MODEL
+        value: gemini-2.0-flash
+      - key: GEMINI_EMBED_MODEL
+        value: text-embedding-004
+      # Cloud speech-to-text (no local Whisper needed).
+      - key: STT_ENGINE
+        value: groq_whisper
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GROQ_WHISPER_MODEL
+        value: whisper-large-v3
+      # Keep the app usable even if the LLM is briefly unreachable.
+      - key: ALLOW_EXTRACTIVE_FALLBACK
+        value: "true"
+      # Sandboxed test runs execute in the container (bundled runner).
+      - key: CODE_EXECUTOR
+        value: local
+      - key: EXEC_PREFER_PYTEST
+        value: "false"
+      # Optional: enables the GitHub push/PR provider. Without it, the local
+      # git provider is used (works offline, inside the container).
+      - key: GITHUB_TOKEN
+        sync: false

@@ -12,6 +12,7 @@ import sys
 TESTS = [
     "tests/test_smoke.py",
     "tests/test_normalize.py",
+    "tests/test_llm_providers.py",
     "tests/test_fallback.py",
     "tests/test_pipeline.py",
     "tests/test_fallback_pipeline.py",

@@ -37,11 +37,24 @@ class Settings(BaseSettings):
     AUTH_SECRET: str = "your-super-secret-auth-key-change-this-in-prod"
     
     # LLM
+    # Provider ladder (first configured wins):
+    #   gemini (cloud, free tier) -> openrouter (cloud fallback) -> ollama (local)
+    # Set LLM_PROVIDER_ORDER to reorder, e.g. "openrouter,gemini,ollama".
+    LLM_PROVIDER_ORDER: str = "gemini,openrouter,ollama"
     OLLAMA_BASE_URL: str = "http://localhost:11434"
     DEFAULT_CHAT_MODEL: str = "llama3.1:8b"
     DEFAULT_SUMMARY_MODEL: str = "llama3.1:8b"
     DEFAULT_FAST_MODEL: str = "llama3.1:8b"
     OPENROUTER_BASE_URL: str = "https://openrouter.ai/api/v1"
+    OPENROUTER_MODEL: str = "meta-llama/llama-3.1-8b-instruct:free"
+
+    # Google Gemini (cloud, free tier, OpenAI-compatible). When GEMINI_API_KEY is
+    # set the app produces real LLM output with nothing installed locally.
+    GEMINI_API_KEY: str = ""
+    GEMINI_BASE_URL: str = "https://generativelanguage.googleapis.com/v1beta/openai"
+    GEMINI_MODEL: str = "gemini-2.0-flash"
+    GEMINI_CODE_MODEL: str = ""
+    GEMINI_EMBED_MODEL: str = "text-embedding-004"
 
     # When no LLM is reachable (no Ollama, no API key) fall back to an offline
     # extractive summary so the pipeline always completes.

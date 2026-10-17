@@ -31,7 +31,7 @@ SyncForge AI bridges the gap between discussions and execution. Instead of meeti
 | **Database** | **SQLite** (zero-setup dev) → [PostgreSQL](https://www.postgresql.org/) + [pgvector](https://github.com/pgvector/pgvector) (production) | Swap with `DATABASE_URL` |
 | **Auth** | JWT (bcrypt) issued by the FastAPI | Phase 1 — OAuth via Auth.js lands later |
 | **STT** | [faster-whisper](https://github.com/SYSTRAN/faster-whisper) (local, free) or [Groq Whisper](https://groq.com/) | Local = 0 cost, Cloud = faster fallback |
-| **LLMs** | [Ollama](https://ollama.com/) (Llama 3.1, Qwen 2.5 Coder) + [OpenRouter](https://openrouter.ai/) fallback + **offline extractive fallback** | Free-first; works with *no* AI service |
+| **LLMs** | [Google Gemini](https://aistudio.google.com/apikey) (cloud, free) → [OpenRouter](https://openrouter.ai/) (cloud fallback) → [Ollama](https://ollama.com/) (local) + **offline extractive fallback** | Cloud-first, free, nothing to install; still works with *no* AI service |
 | **Queue/Worker** | [Celery](https://docs.celeryq.dev/) + [Redis](https://redis.io/) | Background jobs (transcription, agent runs) |
 | **Code Execution** | [Judge0 CE](https://github.com/judge0/judge0) (Docker) or [E2B](https://e2b.dev/) | Sandboxed, isolated execution |
 | **Storage** | [Supabase Storage](https://supabase.com/storage) or Local | Audio/files storage |
@@ -97,8 +97,18 @@ Saumya/
 | **Sandbox test runs** (bundled offline runner, fail → fix → pass) | ✅ Working |
 | **Project Memory (RAG)** (offline embeddings, index → search → clear) | ✅ Working |
 
-**Test suites: 414 checks, all passing** — `smoke`, `normalize`, `fallback`, `pipeline`, `fallback_pipeline`, `team`, `studio`, `ship`, `verify`, `memory`.
+**Test suites: 435 checks, all passing** — `smoke`, `normalize`, `llm_providers`, `fallback`, `pipeline`, `fallback_pipeline`, `team`, `studio`, `ship`, `verify`, `memory`.
 Live HTTP verification: `verify_live_stack.py` (11/11), `verify_live_phase2.py` (16/16), `verify_live_phase3.py` (21/21), `verify_live_phase4.py` (26/26) and `verify_live_phase5.py` (26/26).
+
+## ☁️ Deploy it live (no localhost)
+
+Want a public URL that runs entirely in the cloud — no PC, no Ollama? See
+**[docs/DEPLOY.md](docs/DEPLOY.md)** for a step-by-step, all-free-tier guide:
+
+- **Web (Next.js) → Vercel** · **API (FastAPI) → Render (Docker)** · **Postgres → Neon**
+- **AI → Google Gemini** (free key, nothing installed) · **Speech → Groq Whisper**
+
+Config is only environment variables — the local setup below keeps working unchanged.
 
 ## 🚦 Quickstart
 
@@ -171,11 +181,15 @@ Optional deeper checks:
 
 > **First transcription downloads the Whisper model** (`WHISPER_MODEL=small`, ~460 MB) and caches it at `~/.cache/huggingface`. Set `WHISPER_MODEL=tiny` in `apps\api\.env` for the fastest (lower quality) run.
 
-### 4. Add AI (optional, recommended)
+### 4. Add AI — real LLM output
+
+The provider ladder is **Gemini → OpenRouter → Ollama**. The simplest way to get
+real AI (cloud, free, nothing to install) is a Google AI Studio key:
 
 ```powershell
-# Install Ollama, then:
-ollama pull llama3.1:8b
+# apps\api\.env
+GEMINI_API_KEY=your-gemini-key      # https://aistudio.google.com/apikey
+GEMINI_MODEL=gemini-2.0-flash
 ```
 
 That's it — the API picks it up automatically. Other providers:
@@ -183,7 +197,9 @@ That's it — the API picks it up automatically. Other providers:
 | Want | Set in `apps\api\.env` |
 |---|---|
 | Faster cloud STT | `STT_ENGINE=groq_whisper` + `GROQ_API_KEY=...` |
-| Cloud LLM without Ollama | `OPENROUTER_API_KEY=sk-or-v1-...` |
+| Cloud LLM fallback | `OPENROUTER_API_KEY=sk-or-v1-...` |
+| Fully local LLM (offline) | Install [Ollama](https://ollama.com/) then `ollama pull llama3.1:8b` |
+| Reorder the ladder | `LLM_PROVIDER_ORDER=openrouter,gemini,ollama` |
 | Nothing installed | Everything still works — the **offline extractive fallback** produces a summary, decisions, risks, questions and tasks. The summary is clearly labelled with a ⚠️ notice. Set `ALLOW_EXTRACTIVE_FALLBACK=false` to fail loudly instead. |
 
 ### Environment

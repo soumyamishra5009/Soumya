@@ -1,0 +1,27 @@
+# Keep the image build context small and free of local dev state.
+venv/
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Local data — never ship these into the image
+*.db
+*.sqlite
+*.sqlite3
+uploads/
+devstudio/
+.env
+.env.*
+!/.env.example
+
+# Tests are run in CI / locally, not inside the running image
+tests/
+
+# Docs and misc
+*.md
+!README.md
+.git/
+.gitignore

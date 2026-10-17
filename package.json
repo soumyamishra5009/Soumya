@@ -21,7 +21,7 @@
     "format": "prettier --write \"**/*.{ts,tsx,md,py,json}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,md,py,json}\"",
     "clean": "turbo run clean && rm -rf node_modules",
-    "prepare": "husky install",
+    "prepare": "husky install || true",
     "dev:web": "cd apps/web && npm run dev",
     "dev:api": "cd apps/api && uvicorn main:app --reload --port 8000",
     "setup:ollama": "bash scripts/setup-ollama.sh",
