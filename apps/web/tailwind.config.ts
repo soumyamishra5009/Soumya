@@ -10,6 +10,11 @@ const config = {
     "./src/**/*.{ts,tsx}",
   ],
   prefix: "",
+  safelist: [
+    {
+      pattern: /^stagger-[1-8]$/,
+    },
+  ],
   theme: {
     container: {
       center: true,

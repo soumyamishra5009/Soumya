@@ -72,7 +72,7 @@ export default function TeamPage() {
 
   return (
     <div className="space-y-6">
-      <div>
+      <div className="animate-fade-in-up">
         <h2 className="text-3xl font-bold tracking-tight">Team</h2>
         <p className="text-muted-foreground">
           Members of {workspace?.name ?? "this workspace"} can be assigned tasks
@@ -81,7 +81,7 @@ export default function TeamPage() {
       </div>
 
       {canManage && (
-        <Card>
+        <Card className="card-hover animate-fade-in-up stagger-2">
           <CardHeader>
             <CardTitle className="text-base">Add a member</CardTitle>
             <CardDescription>
@@ -128,7 +128,7 @@ export default function TeamPage() {
         </Card>
       )}
 
-      <Card>
+      <Card className="card-hover animate-fade-in-up stagger-3">
         <CardHeader className="pb-3">
           <CardTitle className="text-base">
             {members.length} {members.length === 1 ? "member" : "members"}

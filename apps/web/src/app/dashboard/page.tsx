@@ -145,34 +145,34 @@ export default function DashboardPage() {
       )}
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <StatCard
+        <div className="animate-fade-in-up stagger-1"><StatCard
           title="Meetings"
           value={meetings.length}
           hint={`${completedMeetings} analysed${processing ? ` · ${processing} processing` : ""}`}
           icon={AudioLines}
-        />
-        <StatCard
+        /></div>
+        <div className="animate-fade-in-up stagger-2"><StatCard
           title="Active Tasks"
           value={activeTasks}
           hint="In progress or in review"
           icon={KanbanSquare}
-        />
-        <StatCard
+        /></div>
+        <div className="animate-fade-in-up stagger-3"><StatCard
           title="Completed"
           value={doneTasks}
           hint={`of ${tasks.length} total tasks`}
           icon={CheckCircle2}
-        />
-        <StatCard
+        /></div>
+        <div className="animate-fade-in-up stagger-4"><StatCard
           title="Overdue"
           value={overdueTasks}
           hint={overdueTasks ? "Needs attention" : "All on track"}
           icon={AlertTriangle}
-        />
+        /></div>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
-        <Card className="lg:col-span-2">
+        <Card className="lg:col-span-2 card-hover animate-fade-in-up stagger-3">
           <CardHeader className="flex flex-row items-center justify-between space-y-0">
             <div>
               <CardTitle className="text-base">Recent meetings</CardTitle>
@@ -233,7 +233,7 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="card-hover animate-fade-in-up stagger-4">
           <CardHeader className="flex flex-row items-center justify-between space-y-0">
             <div>
               <CardTitle className="text-base">Next up</CardTitle>
@@ -292,7 +292,7 @@ export default function DashboardPage() {
         </Card>
       </div>
 
-      <Card>
+      <Card className="animate-fade-in-up stagger-5">
         <CardHeader>
           <CardTitle className="text-base">How it works</CardTitle>
           <CardDescription>
@@ -317,8 +317,8 @@ export default function DashboardPage() {
               title: "3. Execute",
               text: "Action items land on the task board, linked back to the meeting.",
             },
-          ].map((step) => (
-            <div key={step.title} className="rounded-lg border bg-muted/30 p-4">
+          ].map((step, i) => (
+            <div key={step.title} className={`rounded-lg border bg-muted/30 p-4 card-hover animate-fade-in-up stagger-${Math.min(i + 2, 8)}`}>
               <step.icon className="h-5 w-5 text-accent" />
               <p className="mt-3 text-sm font-medium">{step.title}</p>
               <p className="mt-1 text-sm text-muted-foreground">{step.text}</p>

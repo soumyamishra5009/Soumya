@@ -381,8 +381,8 @@ export default function AgentPage() {
   return (
     <div className="mx-auto grid max-w-7xl gap-6 xl:grid-cols-2">
       {/* ---------------------------------------------------- Meeting → Code */}
-      <div className="space-y-6">
-        <Card>
+      <div className="space-y-6 animate-fade-in-up">
+        <Card className="card-hover">
           <CardHeader className="flex-row items-center justify-between space-y-0">
             <CardTitle className="flex items-center gap-2 text-lg">
               <Bot className="h-5 w-5 text-primary" />
@@ -574,8 +574,8 @@ export default function AgentPage() {
       </div>
 
       {/* ------------------------------------------------------------- Ship it */}
-      <div className="space-y-6">
-        <Card>
+      <div className="space-y-6 animate-fade-in-up stagger-2">
+        <Card className="card-hover">
           <CardHeader className="flex-row items-center justify-between space-y-0">
             <CardTitle className="flex items-center gap-2 text-lg">
               <Rocket className="h-5 w-5 text-primary" />

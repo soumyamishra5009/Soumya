@@ -187,7 +187,7 @@ export default function MeetingsPage() {
       </div>
 
       {/* Search + history/archive toggle */}
-      <div className="flex flex-wrap items-center gap-3">
+      <div className="flex flex-wrap items-center gap-3 animate-fade-in-up stagger-2">
         <div className="relative min-w-[16rem] flex-1">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
@@ -418,8 +418,8 @@ export default function MeetingsPage() {
           {meetings.map((m) => {
             const meta = MEETING_STATUS_META[m.status];
             return (
-              <Link key={m.id} href={`/dashboard/meetings/${m.id}`}>
-                <Card className="h-full transition-colors hover:border-primary/50">
+              <Link key={m.id} href={`/dashboard/meetings/${m.id}`} className={`animate-fade-in-up stagger-${Math.min(meetings.indexOf(m) + 1, 8)}`}>
+                <Card className="h-full card-hover">
                   <CardHeader className="space-y-2">
                     <div className="flex items-start justify-between gap-2">
                       <CardTitle className="line-clamp-2 text-base">

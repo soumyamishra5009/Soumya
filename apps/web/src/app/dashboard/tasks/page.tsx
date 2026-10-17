@@ -255,7 +255,7 @@ export default function TasksPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-end justify-between gap-4">
+      <div className="flex flex-wrap items-end justify-between gap-4 animate-fade-in-up">
         <div>
           <h2 className="text-3xl font-bold tracking-tight">Task Board</h2>
           <p className="text-muted-foreground">
@@ -279,7 +279,7 @@ export default function TasksPage() {
       </div>
 
       {/* Filter bar */}
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2 animate-fade-in-up stagger-2">
         <div className="relative min-w-[14rem] flex-1">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
@@ -472,7 +472,7 @@ export default function TasksPage() {
         </div>
       ) : (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          {KANBAN_COLUMNS.map((col) => {
+          {KANBAN_COLUMNS.map((col, colIdx) => {
             const meta = TASK_STATUS_META[col];
             const items = grouped[col];
             return (
@@ -490,7 +490,8 @@ export default function TasksPage() {
                   setDragId(null);
                 }}
                 className={cn(
-                  "flex min-h-[16rem] flex-col rounded-lg border bg-card/40 transition-colors",
+                  "flex min-h-[16rem] flex-col rounded-lg border bg-card/40 transition-colors animate-fade-in-up",
+                  `stagger-${Math.min(colIdx + 1, 8)}`,
                   overColumn === col && "border-primary bg-primary/5"
                 )}
               >

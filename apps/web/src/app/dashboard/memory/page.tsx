@@ -118,7 +118,7 @@ export default function MemoryPage() {
 
   return (
     <div className="mx-auto max-w-5xl space-y-6 p-6">
-      <div className="flex items-start justify-between">
+      <div className="flex items-start justify-between animate-fade-in-up">
         <div>
           <h1 className="flex items-center gap-2 text-2xl font-semibold">
             <Brain className="h-6 w-6 text-primary" />
@@ -134,26 +134,26 @@ export default function MemoryPage() {
 
       {/* stats */}
       <div className="grid gap-3 sm:grid-cols-4">
-        <StatCard icon={<Database className="h-4 w-4" />} label="Chunks" value={String(totalChunks)} />
-        <StatCard
+        <div className="animate-fade-in-up stagger-1"><StatCard icon={<Database className="h-4 w-4" />} label="Chunks" value={String(totalChunks)} /></div>
+        <div className="animate-fade-in-up stagger-2"><StatCard
           icon={<Layers className="h-4 w-4" />}
           label="Sources"
           value={String(Object.keys(stats?.by_type ?? {}).length)}
-        />
-        <StatCard
+        /></div>
+        <div className="animate-fade-in-up stagger-3"><StatCard
           icon={<Zap className="h-4 w-4" />}
           label="Embedder"
           value={stats?.embed_sources?.[0] ?? "—"}
-        />
-        <StatCard
+        /></div>
+        <div className="animate-fade-in-up stagger-4"><StatCard
           icon={<FolderTree className="h-4 w-4" />}
           label="Dimensions"
           value={stats?.dims?.join(", ") || "—"}
-        />
+        /></div>
       </div>
 
       {/* index controls */}
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2 animate-fade-in-up stagger-3">
         <Button onClick={doIndex} disabled={indexing}>
           {indexing ? (
             <Loader2 className="h-4 w-4 animate-spin" />
@@ -187,7 +187,7 @@ export default function MemoryPage() {
       </div>
 
       {/* search */}
-      <div className="flex gap-2">
+      <div className="flex gap-2 animate-fade-in-up stagger-4">
         <Input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
@@ -206,7 +206,7 @@ export default function MemoryPage() {
 
       {/* results */}
       {result && (
-        <div className="space-y-3">
+        <div className="space-y-3 animate-fade-in-up">
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <Sparkles className="h-4 w-4" />
             {result.count} result(s) for &ldquo;{result.query}&rdquo;

@@ -510,7 +510,7 @@ export default function MeetingRoomPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="space-y-4">
+      <div className="space-y-4 animate-fade-in-up">
         <Button variant="ghost" size="sm" asChild className="-ml-2">
           <Link href="/dashboard/meetings">
             <ArrowLeft className="h-4 w-4" /> Back to meetings
@@ -665,7 +665,7 @@ export default function MeetingRoomPage() {
       {/* Split view */}
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Transcript */}
-        <Card className="flex max-h-[calc(100vh-22rem)] flex-col">
+        <Card className="flex max-h-[calc(100vh-22rem)] flex-col card-hover animate-fade-in-up stagger-2">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
             <div>
               <CardTitle className="text-base">Transcript</CardTitle>
@@ -725,7 +725,7 @@ export default function MeetingRoomPage() {
         </Card>
 
         {/* Insights */}
-        <Card className="flex max-h-[calc(100vh-22rem)] flex-col">
+        <Card className="flex max-h-[calc(100vh-22rem)] flex-col card-hover animate-fade-in-up stagger-3">
           <CardHeader className="pb-3">
             <div className="flex gap-1 rounded-lg border bg-muted/30 p-1">
               {(

@@ -463,9 +463,9 @@ export default function StudioPage() {
   }
 
   return (
-    <div className="-m-6 flex h-[calc(100vh-4rem)] flex-col bg-background">
+    <div className="-m-6 flex h-[calc(100vh-4rem)] flex-col bg-background animate-fade-in">
       {/* Toolbar */}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b px-4 py-2">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b px-4 py-2 animate-fade-in-down">
         <div className="flex items-center gap-3">
           <div>
             <h2 className="text-sm font-semibold">Dev Studio</h2>
@@ -505,7 +505,7 @@ export default function StudioPage() {
 
       <div className="flex min-h-0 flex-1">
         {/* File explorer */}
-        <aside className="hidden w-64 flex-col border-r md:flex">
+        <aside className="hidden w-64 flex-col border-r md:flex animate-fade-in-left">
           <div className="border-b px-3 py-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
             Explorer
           </div>
