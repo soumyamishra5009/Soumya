@@ -33,6 +33,18 @@ from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
+
+def _store(db=None):
+    """Return the active storage backend (disk or db)."""
+    from app.services.devstudio_store import get_store
+
+    return get_store(db)
+
+
+def read_content(workspace_id: str, rel_path: str, db=None) -> str | None:
+    """Read raw file content via the active store (used by agent/testrunner)."""
+    return _store(db).read_content(workspace_id, rel_path)
+
 # --------------------------------------------------------------------------
 # Paths, extensions and limits
 # --------------------------------------------------------------------------
@@ -261,118 +273,33 @@ def _build_dir(
     return node
 
 
-def list_tree(workspace_id: str) -> dict[str, Any]:
+def list_tree(workspace_id: str, db=None) -> dict[str, Any]:
     """Nested tree of the workspace sandbox (dirs first, then files)."""
-    root = workspace_root(workspace_id)
-    counter = [0]
-    truncated = [False]
-    if not root.exists():
-        return {
-            "name": "workspace",
-            "path": "",
-            "type": "dir",
-            "children": [],
-            "empty": True,
-            "count": 0,
-            "truncated": False,
-        }
-    node = _build_dir(root, "", 0, counter, truncated)
-    node["name"] = "workspace"
-    node["path"] = ""
-    node["count"] = counter[0]
-    node["empty"] = counter[0] == 0
-    node["truncated"] = truncated[0]
-    return node
+    return _store(db).list_tree(workspace_id)
 
 
-def read_file(workspace_id: str, rel_path: str) -> dict[str, Any]:
+def read_file(workspace_id: str, rel_path: str, db=None) -> dict[str, Any]:
     """Read a text file from the sandbox."""
-    path, rel = resolve_path(workspace_id, rel_path)
-    if not path.exists() or not path.is_file():
-        raise FileNotFoundError(f"{rel} not found")
-    if not is_editable(rel):
-        raise SandboxError(f"{rel} is not an editable text file")
-    size = path.stat().st_size
-    if size > max_file_bytes():
-        raise SandboxError(
-            f"{rel} is {size // 1024} KB, above the "
-            f"{settings.DEVSTUDIO_MAX_FILE_KB} KB editor limit"
-        )
-    try:
-        text = path.read_text(encoding="utf-8")
-    except UnicodeDecodeError as exc:
-        raise SandboxError(f"{rel} is not valid UTF-8 text") from exc
-    return {
-        "path": rel,
-        "name": path.name,
-        "language": language_for(rel),
-        "content": text,
-        "size": size,
-        "editable": True,
-        "hash": content_hash(text),
-        "updated_at": _mtime(path),
-    }
+    return _store(db).read_file(workspace_id, rel_path)
 
 
-def write_file(workspace_id: str, rel_path: str, content: str) -> dict[str, Any]:
+def write_file(workspace_id: str, rel_path: str, content: str, db=None) -> dict[str, Any]:
     """Create or overwrite a text file (parent directories are created)."""
-    path, rel = resolve_path(workspace_id, rel_path)
-    if not is_editable(rel):
-        raise SandboxError(f"{rel} is not an editable text file")
-    payload = content if isinstance(content, str) else ""
-    encoded = payload.encode("utf-8")
-    if len(encoded) > max_file_bytes():
-        raise SandboxError(
-            f"Content is {len(encoded) // 1024} KB, above the "
-            f"{settings.DEVSTUDIO_MAX_FILE_KB} KB limit"
-        )
-    if path.exists() and path.is_dir():
-        raise SandboxError(f"{rel} is a directory")
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(payload, encoding="utf-8")
-    return {
-        "path": rel,
-        "name": path.name,
-        "language": language_for(rel),
-        "content": payload,
-        "size": len(encoded),
-        "editable": True,
-        "hash": content_hash(payload),
-        "updated_at": _mtime(path),
-    }
+    return _store(db).write_file(workspace_id, rel_path, content)
 
 
-def create_file(workspace_id: str, rel_path: str, content: str = "") -> dict[str, Any]:
+def create_file(workspace_id: str, rel_path: str, content: str = "", db=None) -> dict[str, Any]:
     """Create a new file, refusing to clobber an existing one."""
-    path, rel = resolve_path(workspace_id, rel_path)
-    if path.exists():
-        raise SandboxError(f"{rel} already exists")
-    return write_file(workspace_id, rel, content)
+    return _store(db).create_file(workspace_id, rel_path, content)
 
 
-def create_dir(workspace_id: str, rel_path: str) -> dict[str, Any]:
-    path, rel = resolve_path(workspace_id, rel_path)
-    if path.exists() and path.is_file():
-        raise SandboxError(f"{rel} is a file")
-    path.mkdir(parents=True, exist_ok=True)
-    return {"path": rel, "name": path.name, "type": "dir"}
+def create_dir(workspace_id: str, rel_path: str, db=None) -> dict[str, Any]:
+    return _store(db).create_dir(workspace_id, rel_path)
 
 
-def delete_entry(workspace_id: str, rel_path: str) -> dict[str, Any]:
+def delete_entry(workspace_id: str, rel_path: str, db=None) -> dict[str, Any]:
     """Delete a file or a directory (recursively). Never the sandbox root."""
-    path, rel = resolve_path(workspace_id, rel_path)
-    root = workspace_root(workspace_id).resolve()
-    if path.resolve() == root:
-        raise SandboxError("Cannot delete the workspace root")
-    if not path.exists():
-        raise FileNotFoundError(f"{rel} not found")
-    if path.is_dir():
-        import shutil
-
-        shutil.rmtree(path)
-        return {"path": rel, "type": "dir", "deleted": True}
-    path.unlink()
-    return {"path": rel, "type": "file", "deleted": True}
+    return _store(db).delete_entry(workspace_id, rel_path)
 
 
 def _mtime(path: Path) -> str:
@@ -467,16 +394,9 @@ def test_divide_by_zero_returns_none():
 }
 
 
-def seed_sample(workspace_id: str) -> list[str]:
+def seed_sample(workspace_id: str, db=None) -> list[str]:
     """Create the sample project. Only writes files that do not exist yet."""
-    created: list[str] = []
-    for rel, content in SAMPLE_FILES.items():
-        path, _ = resolve_path(workspace_id, rel)
-        if path.exists():
-            continue
-        write_file(workspace_id, rel, content)
-        created.append(rel)
-    return created
+    return _store(db).seed_sample(workspace_id)
 
 
 # --------------------------------------------------------------------------

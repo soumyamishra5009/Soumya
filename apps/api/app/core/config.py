@@ -1,3 +1,5 @@
+import os
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -66,12 +68,16 @@ class Settings(BaseSettings):
     ENABLE_MODEL_ROUTING: bool = True
     
     # STT
+    # whisper_local (faster-whisper) | groq_whisper | gemini (Gemini audio).
     STT_ENGINE: str = "whisper_local"
     WHISPER_MODEL: str = "small"
     WHISPER_DEVICE: str = "cpu"
     WHISPER_COMPUTE_TYPE: str = "int8"
     GROQ_API_KEY: str = ""
     GROQ_WHISPER_MODEL: str = "whisper-large-v3"
+    # Gemini speech-to-text — transcribes audio with the same Gemini key, no
+    # extra service. Used on hosts that can't run a local Whisper model.
+    GEMINI_STT_MODEL: str = "gemini-2.0-flash"
     
     # Storage
     STORAGE_TYPE: str = "local"
@@ -87,15 +93,26 @@ class Settings(BaseSettings):
     DEVSTUDIO_MAX_DEPTH: int = 8
     # How many characters of a file to include as context for the AI chat.
     DEVSTUDIO_CONTEXT_CHARS: int = 12000
+    # Where the sandbox tree lives. "disk" = local filesystem (dev / container).
+    # "db" = rows in the database, so the studio works on serverless hosts
+    # (Vercel/Netlify) that have no writable, persistent filesystem.
+    DEVSTUDIO_BACKEND: str = "disk"
     
     # Code Execution (Phase 5: sandboxed test runs).
     # "local" runs the tests as a subprocess inside the Dev Studio sandbox with a
     # hard timeout (works offline, needs no Docker). "judge0" delegates to a
-    # Judge0-compatible service when one is reachable.
+    # Judge0-compatible service when one is reachable. "piston" uses the public
+    # Piston API (emkc.org). The public instance requires an authorization
+    # token since Feb 2026 — set PISTON_API_KEY if you have one, otherwise
+    # keep CODE_EXECUTOR=local (works on Vercel: subprocess + writable /tmp).
     CODE_EXECUTOR: str = "local"
+    PISTON_API_KEY: str = ""
     JUDGE0_BASE_URL: str = "http://localhost:2358"
     JUDGE0_API_KEY: str = ""
     E2B_API_KEY: str = ""
+    PISTON_BASE_URL: str = "https://emkc.org/api/v2/piston"
+    PISTON_TIMEOUT: float = 60.0
+    DEFAULT_LANGUAGE: str = "python3"
     EXEC_TIMEOUT_SECONDS: int = 30
     EXEC_MAX_MEMORY_MB: int = 512
     # How much captured output to persist per run, and whether to prefer pytest
@@ -140,4 +157,34 @@ class Settings(BaseSettings):
     EXEC_MAX_CPU_PERCENT: int = 50
 
 
+# On Vercel Functions the bundle filesystem is read-only except /tmp, there is
+# no local Whisper model, no subprocess sandbox and no Docker. Apply the
+# serverless defaults *before* Settings() reads the environment, so a plain
+# `vercel env` deployment with only GEMINI_API_KEY + DATABASE_URL configured
+# still picks the working cloud implementations for every pluggable subsystem.
+if os.getenv("VERCEL"):
+    os.environ.setdefault("STT_ENGINE", "gemini")          # Gemini audio transcription
+    os.environ.setdefault("DEVSTUDIO_BACKEND", "db")        # workspace tree in the database
+    os.environ.setdefault("CODE_EXECUTOR", "local")         # bundled runner via subprocess + /tmp
+
 settings = Settings()
+
+# Managed Postgres providers (Vercel Postgres, Neon, some Railway/Render
+# add-ons) hand out bare "postgresql://" or "postgres://" URLs, but SQLAlchemy
+# needs an explicit dialect suffix to pick the psycopg2 driver. Normalise once
+# at import so a copy-pasted connection string just works everywhere.
+_url = settings.DATABASE_URL
+if _url.startswith("postgres://") and not _url.startswith("postgresql://"):
+    _url = "postgresql://" + _url[len("postgres://"):]
+if _url.startswith("postgresql://") and not _url.startswith("postgresql+"):
+    _url = "postgresql+psycopg2://" + _url[len("postgresql://"):]
+settings.DATABASE_URL = _url
+
+# Serverless scratch space: the function bundle is read-only, so uploaded
+# meeting audio and the SQLite fallback (used only when no DATABASE_URL is
+# configured) are redirected to /tmp, the one writable directory on Vercel.
+if os.getenv("VERCEL"):
+    if settings.UPLOAD_DIR in ("./uploads", "uploads"):
+        settings.UPLOAD_DIR = "/tmp/syncforge-uploads"
+    if settings.DATABASE_URL.startswith("sqlite:///./"):
+        settings.DATABASE_URL = "sqlite:////tmp/syncforge.db"

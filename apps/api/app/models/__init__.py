@@ -28,6 +28,7 @@ from app.models.ship import (  # noqa: F401
 )
 from app.models.verify import TestRun  # noqa: F401
 from app.models.memory import MemoryChunk  # noqa: F401
+from app.models.devstudio import WorkspaceFile  # noqa: F401
 
 __all__ = [
     "Base",
@@ -59,4 +60,5 @@ __all__ = [
     "PullRequestProposal",
     "TestRun",
     "MemoryChunk",
+    "WorkspaceFile",
 ]

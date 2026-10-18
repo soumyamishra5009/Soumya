@@ -79,19 +79,8 @@ def extract_keywords(texts: Iterable[str], limit: int = 40) -> list[str]:
     return [word for word, _ in ranked[:limit]]
 
 
-def _read_text(workspace_id: str, rel: str) -> str | None:
-    try:
-        path, _ = devstudio.resolve_path(workspace_id, rel)
-    except devstudio.SandboxError:
-        return None
-    if not path.is_file():
-        return None
-    try:
-        if path.stat().st_size > devstudio.max_file_bytes():
-            return None
-        return path.read_text(encoding="utf-8")
-    except (UnicodeDecodeError, OSError):
-        return None
+def _read_text(workspace_id: str, rel: str, db=None) -> str | None:
+    return devstudio.read_content(workspace_id, rel, db=db)
 
 
 def is_doc(path: str) -> bool:
@@ -110,6 +99,7 @@ def score_files(
     tree: dict[str, Any],
     keywords: list[str],
     max_files: int | None = None,
+    db=None,
 ) -> list[dict[str, Any]]:
     """Rank sandbox files by keyword overlap with the meeting/decisions."""
     limit = max_files or settings.AGENT_MAX_FILES
@@ -117,7 +107,7 @@ def score_files(
     for rel in devstudio.flatten_paths(tree, 500):
         if not devstudio.is_editable(rel):
             continue
-        content = _read_text(workspace_id, rel)
+        content = _read_text(workspace_id, rel, db=db)
         path_l = rel.lower()
         content_l = (content or "").lower()
         hits: dict[str, int] = {}
@@ -165,6 +155,7 @@ def _offline_plan(
     decisions: list[dict[str, Any]],
     tasks: list[dict[str, Any]],
     focus: str | None,
+    db=None,
 ) -> dict[str, Any]:
     meeting = meeting or {}
     corpus: list[str] = [meeting.get("title") or "", meeting.get("summary") or "", focus or ""]
@@ -176,7 +167,7 @@ def _offline_plan(
         corpus += [t.get("title") or "", t.get("description") or ""]
 
     keywords = extract_keywords(corpus)
-    affected = score_files(workspace_id, tree, keywords)
+    affected = score_files(workspace_id, tree, keywords, db=db)
 
     requirements = _dedupe(
         [focus or ""]
@@ -269,13 +260,13 @@ Rules:
 """
 
 
-def _file_context(workspace_id: str, tree: dict[str, Any]) -> str:
+def _file_context(workspace_id: str, tree: dict[str, Any], db=None) -> str:
     lines: list[str] = []
     budget = settings.AGENT_CONTEXT_CHARS
     for rel in devstudio.flatten_paths(tree, 200):
         if not devstudio.is_editable(rel):
             continue
-        head = _read_text(workspace_id, rel) or ""
+        head = _read_text(workspace_id, rel, db=db) or ""
         snippet = "\n".join(head.splitlines()[:40])[:600]
         block = f"### {rel}\n```\n{snippet}\n```\n"
         if budget - len(block) < 0:
@@ -286,7 +277,7 @@ def _file_context(workspace_id: str, tree: dict[str, Any]) -> str:
     return "\n".join(lines) if lines else "(the workspace has no files)"
 
 
-def _coerce_plan(raw: dict[str, Any], valid_paths: set[str], offline: dict[str, Any]) -> dict[str, Any]:
+def _coerce_plan(raw: dict[str, Any], valid_paths: set[str], offline: dict[str, Any], db=None) -> dict[str, Any]:
     """Accept an LLM plan only where it is well-formed; otherwise keep offline parts."""
 
     def _paths(values: Any) -> list[str]:
@@ -371,6 +362,7 @@ def ai_code_plan(
     tasks: list[dict[str, Any]] | None = None,
     focus: str | None = None,
     allow_fallback: bool | None = None,
+    db=None,
 ) -> dict[str, Any]:
     """Build a Meeting→Code plan. Always returns a dict with a ``source`` key."""
     decisions = decisions or []
@@ -379,7 +371,7 @@ def ai_code_plan(
         allow_fallback = settings.ALLOW_EXTRACTIVE_FALLBACK
 
     offline = _offline_plan(
-        workspace_id, tree=tree, meeting=meeting, decisions=decisions, tasks=tasks, focus=focus
+        workspace_id, tree=tree, meeting=meeting, decisions=decisions, tasks=tasks, focus=focus, db=db
     )
     valid_paths = set(devstudio.flatten_paths(tree, 500))
 
@@ -400,7 +392,7 @@ def ai_code_plan(
         f"## Decisions\n{decision_lines}\n\n"
         f"## Linked tasks\n{task_lines}\n\n"
         f"## Extra focus from the user\n{focus or '(none)'}\n\n"
-        f"## Repository files (only these exist)\n{_file_context(workspace_id, tree)}\n\n"
+        f"## Repository files (only these exist)\n{_file_context(workspace_id, tree, db=db)}\n\n"
         "Produce the plan JSON now."
     )
 
@@ -416,7 +408,7 @@ def ai_code_plan(
         )
         if not isinstance(raw, dict):
             raise ValueError("plan was not a JSON object")
-        return _coerce_plan(raw, valid_paths, offline)
+        return _coerce_plan(raw, valid_paths, offline, db=db)
     except Exception as exc:
         if not allow_fallback:
             raise

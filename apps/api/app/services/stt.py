@@ -174,23 +174,128 @@ def _transcribe_groq(audio_path: str) -> dict[str, Any]:
     }
 
 
+def _transcribe_gemini(audio_path: str) -> dict[str, Any]:
+    """Gemini speech-to-text — uses the same Gemini key, no extra service.
+
+    Sends the audio inline to Gemini's native ``generateContent`` endpoint and
+    asks for a verbatim transcript. Gemini returns plain text (no timestamps),
+    so the transcript is split into sentence-level segments with timestamps
+    estimated from the media duration.
+    """
+    import base64
+    import mimetypes
+
+    import httpx
+
+    api_key = os.getenv("GEMINI_API_KEY", "").strip()
+    if not api_key:
+        raise RuntimeError("GEMINI_API_KEY not configured")
+
+    model = os.getenv("GEMINI_STT_MODEL", "gemini-2.0-flash")
+    ext = os.path.splitext(audio_path)[1].lower()
+    mime = mimetypes.guess_type(audio_path)[0] or "audio/mpeg"
+
+    with open(audio_path, "rb") as fh:
+        audio_b64 = base64.b64encode(fh.read()).decode("ascii")
+
+    payload = {
+        "contents": [{
+            "parts": [
+                {"inline_data": {"mime_type": mime, "data": audio_b64}},
+                {"text": (
+                    "Transcribe this audio verbatim. Output only the transcript "
+                    "text — no speaker labels, no timestamps, no commentary. "
+                    "Preserve the original language."
+                )},
+            ]
+        }],
+        "generationConfig": {"temperature": 0.0},
+    }
+    url = (
+        "https://generativelanguage.googleapis.com/v1beta/models/"
+        f"{model}:generateContent?key={api_key}"
+    )
+    with httpx.Client(timeout=180.0) as client:
+        resp = client.post(url, json=payload)
+    resp.raise_for_status()
+    data = resp.json()
+
+    try:
+        text = data["candidates"][0]["content"]["parts"][0]["text"]
+    except (KeyError, IndexError) as exc:
+        raise RuntimeError(f"Gemini returned no transcript: {str(data)[:200]}") from exc
+    text = (text or "").strip()
+
+    # Estimate duration for timestamping (best-effort; None is fine).
+    duration = 0.0
+    try:
+        from app.services.audio import probe_duration_seconds
+
+        duration = probe_duration_seconds(audio_path) or 0.0
+    except Exception:  # pragma: no cover - probing is best-effort
+        duration = 0.0
+
+    segments = _segmentize(text, duration)
+    return {
+        "full_text": text,
+        "segments": segments,
+        "language": "",
+        "duration_seconds": duration,
+        "engine": "gemini",
+        "model": model,
+    }
+
+
+def _segmentize(text: str, duration: float) -> list[dict[str, Any]]:
+    """Split a plain transcript into sentence-level segments with timestamps."""
+    import re
+
+    sentences = [s.strip() for s in re.split(r"(?<=[.!?])\s+", text) if s.strip()]
+    if not sentences:
+        return []
+    # Distribute the duration proportionally to each sentence's word count.
+    words = [max(1, len(s.split())) for s in sentences]
+    total_words = sum(words)
+    segments: list[dict[str, Any]] = []
+    cursor = 0.0
+    for sent, wc in zip(sentences, words):
+        span = (wc / total_words) * duration if duration > 0 else 0.0
+        segments.append({
+            "start": round(cursor, 3),
+            "end": round(cursor + span, 3),
+            "text": sent,
+            "speaker": None,
+            "confidence": None,
+        })
+        cursor += span
+    return segments
+
+
 def transcribe(audio_path: str, engine: str | None = None) -> dict[str, Any]:
     """Transcribe an audio file. Raises on failure (caller handles fallback)."""
     engine = engine or os.getenv("STT_ENGINE", "whisper_local")
     if engine == "groq_whisper":
         return _transcribe_groq(audio_path)
+    if engine == "gemini":
+        return _transcribe_gemini(audio_path)
     return _transcribe_local(audio_path)
 
 
 def transcribe_with_fallback(audio_path: str) -> dict[str, Any]:
-    """Try the configured engine, then fall back to the other one.
+    """Try the configured engine, then fall back to the other ones.
 
-    Raises RuntimeError if neither engine can produce a transcript.
+    Raises RuntimeError if no engine can produce a transcript.
     """
     primary = os.getenv("STT_ENGINE", "whisper_local")
-    errors: list[str] = []
+    if primary == "gemini":
+        order = ["gemini", "groq_whisper", "whisper_local"]
+    elif primary == "groq_whisper":
+        order = ["groq_whisper", "gemini", "whisper_local"]
+    else:
+        order = ["whisper_local", "gemini", "groq_whisper"]
 
-    for engine in ([primary] if primary == "groq_whisper" else ["whisper_local", "groq_whisper"]):
+    errors: list[str] = []
+    for engine in order:
         try:
             return transcribe(audio_path, engine=engine)
         except Exception as exc:

@@ -1,7 +1,13 @@
 """Sandboxed test execution — the "verification" step of the pipeline.
 
-A run happens entirely inside the workspace's Dev Studio sandbox
-(``DEVSTUDIO_ROOT/<workspace_id>``) as a plain subprocess:
+A run happens inside the workspace's Dev Studio sandbox as a plain subprocess:
+
+* disk backend — rooted at ``DEVSTUDIO_ROOT/<workspace_id>``;
+* db backend (Vercel/serverless) — the tree is materialised from the database
+  into a temp directory, run there, then removed (Functions allow subprocess
+  with a writable /tmp).
+
+Two Python runners:
 
 * **builtin** — a bundled, dependency-free runner (no pytest required) that
   collects ``test_*`` functions and ``unittest.TestCase`` classes, runs them and
@@ -9,6 +15,9 @@ A run happens entirely inside the workspace's Dev Studio sandbox
   works on a bare machine.
 * **pytest** — used automatically when pytest is importable (``EXEC_PREFER_PYTEST``).
 * **node** — Node's built-in ``node --test`` runner for JavaScript projects.
+
+An optional remote executor (``CODE_EXECUTOR=piston``) posts a single entry
+script to the Piston API; it needs ``PISTON_API_KEY`` since Feb 2026.
 
 Hard rules, mirroring the rest of the sandbox code:
 
@@ -24,9 +33,12 @@ runner is told not to write.
 
 from __future__ import annotations
 
+import base64
+import json
 import logging
 import os
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -226,6 +238,249 @@ def has_no_tests(output: str) -> bool:
     return "SYNCFORGE_NO_TESTS" in text or "no tests ran" in text.lower()
 
 
+# ---------------------------------------------------------------------------
+# Optional Piston remote executor (emkc.org). The public instance has required
+# an authorization token since Feb 2026 — set PISTON_API_KEY to use it.
+# ---------------------------------------------------------------------------
+
+_PISTON_RUNTIME_CACHE: dict[str, str] = {}
+_PISTON_LOCK = __import__("threading").Lock()
+
+
+def _piston_runtime(language: str) -> tuple[str, str]:
+    """Resolve ``(language, version)`` for Piston via GET /runtimes (cached).
+
+    The public instance does not accept a wildcard version, so the exact
+    version is looked up once and reused for the process lifetime.
+    """
+    if language in _PISTON_RUNTIME_CACHE:
+        return language, _PISTON_RUNTIME_CACHE[language]
+
+    import httpx
+
+    with httpx.Client(timeout=15.0) as client:
+        resp = client.get(f"{settings.PISTON_BASE_URL}/runtimes")
+        resp.raise_for_status()
+        runtimes = resp.json()
+
+    wanted = language.lower()
+    for rt in runtimes:
+        names = [str(rt.get("language", "")).lower()]
+        names += [str(a).lower() for a in rt.get("aliases", [])]
+        if wanted in names:
+            with _PISTON_LOCK:
+                _PISTON_RUNTIME_CACHE[language] = str(rt["version"])
+            return language, str(rt["version"])
+    raise TestRunError(f"The Piston service has no runtime for {language!r}")
+
+
+def _piston_execute(code: str, *, language: str = "python", timeout: int | None = None) -> dict[str, Any]:
+    """POST a single entry script to the public Piston API and collect the run.
+
+    Returns ``stdout``, ``stderr``, ``exit_code`` and ``timed_out``.
+    """
+    import httpx
+
+    lang, version = _piston_runtime(language)
+    body = {
+        "language": lang,
+        "version": version,
+        "files": [{"name": "main.py", "content": code}],
+        "stdin": "",
+    }
+    client_timeout = float(timeout or settings.PISTON_TIMEOUT)
+    started = time.perf_counter()
+    headers: dict[str, str] = {}
+    if settings.PISTON_API_KEY:
+        headers["Authorization"] = f"Bearer {settings.PISTON_API_KEY}"
+    try:
+        with httpx.Client(timeout=client_timeout) as client:
+            resp = client.post(
+                f"{settings.PISTON_BASE_URL}/execute", json=body, headers=headers or None
+            )
+        resp.raise_for_status()
+        data = resp.json()
+    except httpx.TimeoutException:
+        return {"stdout": "", "stderr": "piston request timed out", "exit_code": -1, "timed_out": True}
+    except httpx.HTTPStatusError as exc:
+        if exc.response.status_code == 401:
+            raise TestRunError(
+                "The Piston API rejected the request (401 Unauthorized). The "
+                "public instance has required an authorization token since "
+                "Feb 2026 — set PISTON_API_KEY, or use CODE_EXECUTOR=local "
+                "(the default on Vercel)."
+            ) from exc
+        raise TestRunError(f"Piston execution failed: {exc}") from exc
+    except Exception as exc:  # network errors
+        raise TestRunError(f"Piston execution could not be started: {exc}") from exc
+
+    run = data.get("run") or {}
+    compile_stage = data.get("compile") or {}
+    stderr = str(run.get("stderr") or "")
+    if compile_stage.get("stderr"):
+        stderr = str(compile_stage["stderr"]) + ("\n" + stderr if stderr else "")
+
+    duration_ms = int((time.perf_counter() - started) * 1000)
+    # Piston reports the exit status as ``code`` (not ``exit_code``).
+    exit_code = run.get("code", run.get("exit_code"))
+    # Piston reports status "finished" on normal completion; a CPU-limit kill
+    # comes back as an error status with a signal/killed message.
+    status_detail = str((run.get("status") or {}).get("detail", ""))
+    timed_out = status_detail == "TO" or "timed out" in stderr.lower()
+    if timed_out and exit_code is None:
+        exit_code = -1
+
+    return {
+        "stdout": str(run.get("stdout") or ""),
+        "stderr": stderr,
+        "exit_code": int(exit_code) if exit_code is not None else -1,
+        "timed_out": bool(timed_out),
+        "duration_ms": duration_ms,
+    }
+
+
+def _piston_entry_script(files: list[dict[str, Any]], rel_target: str | None) -> str:
+    """Build a self-contained entry script for Piston.
+
+    Piston executes exactly one entry file, so the whole workspace tree is
+    embedded as base64 literals, written into the working directory on start,
+    and the bundled dependency-free runner is exec'd with the same argv the
+    local path uses — giving byte-identical output (SYNCFORGE_RESULT lines)
+    and exit-code semantics for both modes.
+    """
+    payload = {f["path"]: base64.b64encode(f["content"].encode("utf-8")).decode("ascii") for f in files}
+    return (
+        "import base64, os, sys\n"
+        f"FILES = {payload!r}\n"
+        "for _rel, _b64 in FILES.items():\n"
+        "    _p = os.path.abspath(_rel.replace('/', os.sep))\n"
+        "    os.makedirs(os.path.dirname(_p) or '.', exist_ok=True)\n"
+        "    with open(_p, 'wb') as _fh:\n"
+        "        _fh.write(base64.b64decode(_b64))\n"
+        f"_RUNNER = {BUILTIN_RUNNER!r}\n"
+        "_root = os.path.abspath('.')\n"
+        "sys.path.insert(0, _root)\n"
+        "sys.argv = ['syncforge_runner.py', _root, " + repr(rel_target or "") + "]\n"
+        "_ns = {'__name__': '__main__', '__file__': 'syncforge_runner.py'}\n"
+        "exec(compile(_RUNNER, 'syncforge_runner.py', 'exec'), _ns)\n"
+    )
+
+
+def _detect_kind_from_paths(paths: list[str], target: str | None) -> str | None:
+    """Same rules as :func:`detect_kind`, but over a path list (no disk)."""
+    if target:
+        suffix = Path(target).suffix.lower()
+        if suffix == ".py":
+            return "python"
+        if suffix in (".js", ".mjs", ".cjs", ".ts"):
+            return "node"
+
+    names = [p.rsplit("/", 1)[-1] for p in paths]
+    if any(_is_py_test(n) for n in names):
+        return "python"
+    if any(_is_js_test(n) for n in names):
+        return "node"
+    if "package.json" in names:
+        return "node"
+    if any(p.endswith(".py") for p in paths):
+        return "python"
+    return None
+
+
+def _run_tests_piston(
+    workspace_id: str,
+    *,
+    kind: str = "auto",
+    target: str | None = None,
+    timeout: int | None = None,
+) -> dict[str, Any]:
+    """Run a workspace's tests through the public Piston API (cloud mode).
+
+    Reads the sandbox via the active store (disk *or* database), so it works
+    unchanged on hosts with no writable filesystem.
+    """
+    from app.core.database import SessionLocal
+    from app.services.devstudio_store import get_store
+
+    db = SessionLocal()
+    try:
+        store = get_store(db)
+        files = store.get_all_files(workspace_id)
+    finally:
+        db.close()
+
+    if not files:
+        raise TestRunError("The workspace sandbox is empty — seed the sample project first.")
+
+    rel_target: str | None = None
+    if target:
+        try:
+            rel_target = devstudio.normalize_rel(target)  # rejects traversal / .git
+        except Exception as exc:  # noqa: BLE001
+            raise TestRunError(str(exc)) from exc
+        if rel_target not in {f["path"] for f in files}:
+            raise TestRunError(f"{rel_target} was not found in the sandbox")
+
+    resolved = kind if kind != "auto" else _detect_kind_from_paths(
+        [f["path"] for f in files], rel_target
+    )
+    if resolved is None:
+        raise TestRunError(
+            "Could not detect a test setup. Add a Python (test_*.py) or Node "
+            "(node --test) test file, or run the bundled sample project."
+        )
+    if resolved == "node":
+        raise TestRunError(
+            "Cloud verification (CODE_EXECUTOR=piston) currently runs Python "
+            "tests. For Node projects set CODE_EXECUTOR=local (container/local "
+            "hosts)."
+        )
+
+    entry = _piston_entry_script(files, rel_target)
+    limit = _timeout(timeout)
+    result = _piston_execute(entry, language="python", timeout=limit + 15)
+
+    output = result["stdout"]
+    if result["stderr"]:
+        output += ("\n" if output else "") + result["stderr"]
+    exit_code = result["exit_code"]
+    passed, failed, errors = parse_counts(output)
+
+    if result["timed_out"]:
+        status = TestRunStatus.TIMEOUT
+        output = f"⏱️ Timed out after {limit}s (Piston CPU limit).\n\n" + output
+    elif has_no_tests(output):
+        status = TestRunStatus.ERROR
+        output = "No tests were collected.\n\n" + output
+    elif failed or errors:
+        status = TestRunStatus.FAILED
+    elif exit_code == 0 and passed > 0:
+        status = TestRunStatus.PASSED
+    elif exit_code == 0:
+        status = TestRunStatus.ERROR
+        output = "No tests were collected.\n\n" + output
+    else:
+        status = TestRunStatus.ERROR
+
+    bounded, truncated = _truncate_output(output, settings.EXEC_MAX_OUTPUT_CHARS)
+
+    return {
+        "kind": resolved,
+        "runner": "piston",
+        "command": f"piston:python {settings.PISTON_BASE_URL} (bundled runner)",
+        "target": rel_target,
+        "status": status.value,
+        "exit_code": exit_code,
+        "passed": passed,
+        "failed": failed,
+        "errors": errors,
+        "duration_ms": result.get("duration_ms", 0),
+        "output": bounded,
+        "output_truncated": truncated,
+        "source": "piston",
+    }
+
+
 # --------------------------------------------------------------------------
 # Detection
 # --------------------------------------------------------------------------
@@ -405,10 +660,74 @@ def run_tests(
     if kind not in KINDS:
         raise TestRunError(f"Unknown run kind {kind!r} (expected one of {', '.join(KINDS)})")
 
-    root = devstudio.workspace_root(workspace_id)
-    if not root.exists() or not any(root.iterdir()):
-        raise TestRunError("The workspace sandbox is empty — seed the sample project first.")
+    executor_name = (executor or settings.CODE_EXECUTOR or "local").lower()
+    if executor_name == "piston":
+        # Optional remote executor (public Piston API). The public instance has
+        # required an authorization token since Feb 2026 — set PISTON_API_KEY,
+        # or stay on CODE_EXECUTOR=local (the default on Vercel). Dispatched
+        # before any disk checks because the sandbox may live in the database.
+        return _run_tests_piston(workspace_id, kind=kind, target=target, timeout=timeout)
 
+    backend = os.getenv("DEVSTUDIO_BACKEND", settings.DEVSTUDIO_BACKEND).lower()
+    tmp_root: Path | None = None
+    if backend == "db":
+        # Cloud/serverless mode: the sandbox tree lives in the database, but
+        # execution needs real files. Materialise the tree into a temp dir and
+        # run there — Vercel Functions allow subprocess with a writable /tmp,
+        # so the bundled runner works unchanged in that environment.
+        tmp_root = _materialize_db_sandbox(workspace_id)
+        root = tmp_root
+    else:
+        root = devstudio.workspace_root(workspace_id)
+        if not root.exists() or not any(root.iterdir()):
+            raise TestRunError("The workspace sandbox is empty — seed the sample project first.")
+
+    try:
+        return _run_tests_in_root(
+            root,
+            workspace_id,
+            kind=kind,
+            target=target,
+            timeout=timeout,
+            prefer_pytest=prefer_pytest,
+            executor=executor,
+        )
+    finally:
+        if tmp_root is not None:
+            shutil.rmtree(tmp_root, ignore_errors=True)
+
+
+def _materialize_db_sandbox(workspace_id: str) -> Path:
+    """Write the DB-backed sandbox tree into a fresh temp directory."""
+    from app.core.database import SessionLocal
+    from app.services.devstudio_store import get_store
+
+    db = SessionLocal()
+    try:
+        files = get_store(db).get_all_files(workspace_id)
+    finally:
+        db.close()
+    if not files:
+        raise TestRunError("The workspace sandbox is empty — seed the sample project first.")
+    root = Path(tempfile.mkdtemp(prefix=f"syncforge_ws_{uuid.uuid4().hex[:8]}_"))
+    for f in files:
+        dest = root / f["path"].replace("/", os.sep)
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_text(f.get("content") or "", encoding="utf-8")
+    return root
+
+
+def _run_tests_in_root(
+    root: Path,
+    workspace_id: str,
+    *,
+    kind: str = "auto",
+    target: str | None = None,
+    timeout: int | None = None,
+    prefer_pytest: bool | None = None,
+    executor: str | None = None,
+) -> dict[str, Any]:
+    """Execute a workspace's tests inside an on-disk sandbox root."""
     rel_target: str | None = None
     if target:
         try:

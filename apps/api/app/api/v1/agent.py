@@ -173,7 +173,7 @@ def create_plan(
         task_query = task_query.filter(Task.meeting_id == meeting.id)
     tasks = task_query.order_by(Task.created_at.desc()).limit(_MAX_TASKS).all()
 
-    tree = devstudio.list_tree(workspace_id)
+    tree = devstudio.list_tree(workspace_id, db=db)
     result = agent.ai_code_plan(
         workspace_id,
         tree=tree,
@@ -181,6 +181,7 @@ def create_plan(
         decisions=[_decision_dict(d) for d in decisions],
         tasks=[_task_dict(t) for t in tasks],
         focus=payload.focus,
+        db=db,
     )
 
     plan = CodePlan(

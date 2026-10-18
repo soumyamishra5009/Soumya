@@ -149,7 +149,7 @@ def get_tree(
     user: User = Depends(get_current_user),
 ) -> StudioTree:
     _assert_member(db, workspace_id, user)
-    return StudioTree(**devstudio.list_tree(workspace_id))
+    return StudioTree(**devstudio.list_tree(workspace_id, db=db))
 
 
 @router.post(
@@ -164,7 +164,7 @@ def seed_project(
 ) -> SeedResult:
     """Create the bundled sample project (skips files that already exist)."""
     _assert_member(db, workspace_id, user)
-    created = devstudio.seed_sample(workspace_id)
+    created = devstudio.seed_sample(workspace_id, db=db)
     total = len(devstudio.SAMPLE_FILES)
     return SeedResult(created=created, skipped=total - len(created))
 
@@ -181,7 +181,7 @@ def get_file(
 ) -> StudioFile:
     _assert_member(db, workspace_id, user)
     try:
-        return StudioFile(**devstudio.read_file(workspace_id, path))
+        return StudioFile(**devstudio.read_file(workspace_id, path, db=db))
     except FileNotFoundError:
         raise HTTPException(status_code=404, detail="File not found")
     except devstudio.SandboxError as exc:
@@ -202,7 +202,7 @@ def put_file(
     """Save a file (creates it and any parent directories if needed)."""
     _assert_member(db, workspace_id, user)
     try:
-        return StudioFile(**devstudio.write_file(workspace_id, path, payload.content))
+        return StudioFile(**devstudio.write_file(workspace_id, path, payload.content, db=db))
     except devstudio.SandboxError as exc:
         raise _sandbox_error(exc)
 
@@ -221,8 +221,8 @@ def create_entry(
     _assert_member(db, workspace_id, user)
     try:
         if payload.kind == "dir":
-            return EntryOut(**devstudio.create_dir(workspace_id, payload.path))
-        result = devstudio.create_file(workspace_id, payload.path, payload.content)
+            return EntryOut(**devstudio.create_dir(workspace_id, payload.path, db=db))
+        result = devstudio.create_file(workspace_id, payload.path, payload.content, db=db)
         return EntryOut(path=result["path"], name=result["name"], type="file")
     except devstudio.SandboxError as exc:
         raise _sandbox_error(exc)
@@ -240,7 +240,7 @@ def delete_entry(
 ) -> EntryOut:
     _assert_member(db, workspace_id, user)
     try:
-        return EntryOut(**devstudio.delete_entry(workspace_id, path))
+        return EntryOut(**devstudio.delete_entry(workspace_id, path, db=db))
     except FileNotFoundError:
         raise HTTPException(status_code=404, detail="Path not found")
     except devstudio.SandboxError as exc:
@@ -288,7 +288,7 @@ def studio_chat(
     optionally linked meeting or task."""
     _assert_member(db, workspace_id, user)
 
-    tree = devstudio.list_tree(workspace_id)
+    tree = devstudio.list_tree(workspace_id, db=db)
     file_path: str | None = None
     file_content: str | None = None
     language = "plaintext"
@@ -382,6 +382,7 @@ def create_proposal(
             created_by=user.id,
             meeting_context=_meeting_context(db, payload.meeting_id, user),
             task_context=_task_context(db, payload.task_id, user),
+            db=db,
         )
     except proposals.ProposalError as exc:
         message = str(exc)
@@ -441,7 +442,7 @@ def approve_proposal(
 
     try:
         written = devstudio.write_file(
-            workspace_id, proposal.file_path, proposal.proposed_content
+            workspace_id, proposal.file_path, proposal.proposed_content, db=db
         )
     except devstudio.SandboxError as exc:
         raise _sandbox_error(exc)

@@ -30,10 +30,10 @@ SyncForge AI bridges the gap between discussions and execution. Instead of meeti
 | **Backend** | [FastAPI](https://fastapi.tiangolo.com/) (Python 3.11+) | High-performance API |
 | **Database** | **SQLite** (zero-setup dev) → [PostgreSQL](https://www.postgresql.org/) + [pgvector](https://github.com/pgvector/pgvector) (production) | Swap with `DATABASE_URL` |
 | **Auth** | JWT (bcrypt) issued by the FastAPI | Phase 1 — OAuth via Auth.js lands later |
-| **STT** | [faster-whisper](https://github.com/SYSTRAN/faster-whisper) (local, free) or [Groq Whisper](https://groq.com/) | Local = 0 cost, Cloud = faster fallback |
+| **STT** | [Gemini audio transcription](https://aistudio.google.com/apikey) (cloud, same key) or [faster-whisper](https://github.com/SYSTRAN/faster-whisper) (local, free) | Gemini = zero local setup; local = fully offline |
 | **LLMs** | [Google Gemini](https://aistudio.google.com/apikey) (cloud, free) → [OpenRouter](https://openrouter.ai/) (cloud fallback) → [Ollama](https://ollama.com/) (local) + **offline extractive fallback** | Cloud-first, free, nothing to install; still works with *no* AI service |
 | **Queue/Worker** | [Celery](https://docs.celeryq.dev/) + [Redis](https://redis.io/) | Background jobs (transcription, agent runs) |
-| **Code Execution** | [Judge0 CE](https://github.com/judge0/judge0) (Docker) or [E2B](https://e2b.dev/) | Sandboxed, isolated execution |
+| **Code Execution** | Bundled sandboxed runner (default, zero deps) → optional [Judge0](https://github.com/judge0/judge0) / [E2B](https://e2b.dev/) / [Piston](https://github.com/engineer-man/piston) | Works locally, in Docker and on Vercel (`/tmp` sandbox) |
 | **Storage** | [Supabase Storage](https://supabase.com/storage) or Local | Audio/files storage |
 | **Git** | [GitHub REST/GraphQL API](https://docs.github.com/en/rest) | Repo access, PR proposals |
 
@@ -105,8 +105,8 @@ Live HTTP verification: `verify_live_stack.py` (11/11), `verify_live_phase2.py` 
 Want a public URL that runs entirely in the cloud — no PC, no Ollama? See
 **[docs/DEPLOY.md](docs/DEPLOY.md)** for a step-by-step, all-free-tier guide:
 
-- **Web (Next.js) → Vercel** · **API (FastAPI) → Render (Docker)** · **Postgres → Neon**
-- **AI → Google Gemini** (free key, nothing installed) · **Speech → Groq Whisper**
+- **Web + API + Postgres → Vercel** (one project, Services mode — `vercel.json`)
+- **AI → Google Gemini** (one free key: LLM + speech-to-text + embeddings)
 
 Config is only environment variables — the local setup below keeps working unchanged.
 
@@ -196,7 +196,8 @@ That's it — the API picks it up automatically. Other providers:
 
 | Want | Set in `apps\api\.env` |
 |---|---|
-| Faster cloud STT | `STT_ENGINE=groq_whisper` + `GROQ_API_KEY=...` |
+| Cloud STT (same Gemini key) | `STT_ENGINE=gemini` (auto on Vercel) |
+| Faster local STT | `STT_ENGINE=whisper_local` + `pip install -r requirements-dev.txt` |
 | Cloud LLM fallback | `OPENROUTER_API_KEY=sk-or-v1-...` |
 | Fully local LLM (offline) | Install [Ollama](https://ollama.com/) then `ollama pull llama3.1:8b` |
 | Reorder the ladder | `LLM_PROVIDER_ORDER=openrouter,gemini,ollama` |
@@ -208,7 +209,7 @@ Copy `.env.example` → `apps\api\.env`. The important keys:
 
 ```ini
 DATABASE_URL=sqlite:///./syncforge.db   # dev default; use postgres+pgvector in prod
-STT_ENGINE=whisper_local                # or groq_whisper
+STT_ENGINE=whisper_local                # or gemini (cloud, same key as the LLM)
 WHISPER_MODEL=small                     # tiny | base | small | medium | large-v3
 OLLAMA_BASE_URL=http://localhost:11434
 DEFAULT_SUMMARY_MODEL=llama3.1:8b

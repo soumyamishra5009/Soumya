@@ -20,15 +20,11 @@ class ProposalError(ValueError):
     """Raised when a proposal cannot be built (bad path, too large, ...)."""
 
 
-def current_content(workspace_id: str, rel_path: str) -> str | None:
+def current_content(workspace_id: str, rel_path: str, db=None) -> str | None:
     """Read a sandbox file for hashing, ignoring the editor size limit."""
-    path, _ = devstudio.resolve_path(workspace_id, rel_path)
-    if not path.exists() or not path.is_file():
-        return None
-    try:
-        return path.read_text(encoding="utf-8")
-    except (UnicodeDecodeError, OSError):
-        return None
+    from app.services.devstudio import _store
+
+    return _store(db).read_content(workspace_id, rel_path)
 
 
 def build_code_proposal(
@@ -41,6 +37,7 @@ def build_code_proposal(
     created_by: str | None = None,
     meeting_context: str | None = None,
     task_context: str | None = None,
+    db=None,
 ) -> CodeProposal:
     """Ask the AI to propose a change to one file. Returns an unsaved model."""
     try:
@@ -48,7 +45,7 @@ def build_code_proposal(
     except devstudio.SandboxError as exc:
         raise ProposalError(str(exc)) from exc
 
-    original = current_content(workspace_id, rel)
+    original = current_content(workspace_id, rel, db=db)
     language = devstudio.language_for(rel)
 
     result = devstudio.ai_code_proposal(

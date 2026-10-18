@@ -1,0 +1,44 @@
+# SyncForge AI — FULL local development dependencies.
+#
+# Starts from the lean cloud baseline (requirements.txt -> requirements-cloud.txt)
+# and adds everything that only runs on a developer machine or a container
+# host with a writable filesystem:
+#
+#   * faster-whisper / soundfile / numpy -> local STT (STT_ENGINE=whisper_local)
+#   * celery / redis / flower           -> app/workers background tasks
+#   * ollama / openai / instructor / tiktoken -> optional local LLM clients
+#   * PyGithub                          -> optional GitHub SDK helper
+#   * pgvector / asyncpg                -> Postgres vector/async drivers
+#
+# Vercel and other serverless hosts should NOT install this file — they get
+# requirements.txt (the lean set) automatically.
+
+-r requirements.txt
+
+# Database extras (Postgres vector + async driver)
+pgvector>=0.3.0
+asyncpg>=0.29.0
+
+# Background Tasks (local workers only)
+celery>=5.4.0
+redis>=5.0.0
+flower>=2.0.0
+
+# AI & LLM local clients
+instructor>=1.7.0
+ollama>=0.4.0
+openai>=1.54.0
+tiktoken>=0.8.0
+
+# Speech to Text (local)
+faster-whisper>=1.1.0
+soundfile>=0.12.1
+numpy>=2.3.2
+
+# File Processing / GitHub / utils
+aiofiles>=24.1.0
+PyGithub>=2.3.0
+tenacity>=9.0.0
+rich>=13.8.0
+structlog>=24.4.0
+pytz>=2024.1

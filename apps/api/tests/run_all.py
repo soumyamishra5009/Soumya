@@ -21,6 +21,7 @@ TESTS = [
     "tests/test_ship.py",
     "tests/test_verify.py",
     "tests/test_memory.py",
+    "tests/test_cloud.py",
 ]
 
 try:
