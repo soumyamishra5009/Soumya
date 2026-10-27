@@ -1,9 +1,9 @@
 {
-  "name": "syncforge-ai",
+  "name": "cognix-ai",
   "version": "0.1.0",
   "private": true,
   "description": "AI-powered workspace: Meetings → Decisions → Tasks → Code → Verification",
-  "author": "SyncForge AI",
+  "author": "Cognix",
   "license": "MIT",
   "workspaces": [
     "apps/*",
@@ -13,6 +13,10 @@
     "dev": "powershell -ExecutionPolicy Bypass -File scripts/start-all.ps1",
     "dev:all": "powershell -ExecutionPolicy Bypass -File scripts/start-all.ps1",
     "dev:all:stop": "powershell -ExecutionPolicy Bypass -File scripts/start-all.ps1 -Stop",
+    "demo": "powershell -ExecutionPolicy Bypass -File scripts/demo.ps1",
+    "demo:no-browser": "powershell -ExecutionPolicy Bypass -File scripts/demo.ps1 -NoBrowser",
+    "setup": "powershell -ExecutionPolicy Bypass -File scripts/setup-dev.ps1",
+    "setup:dev": "powershell -ExecutionPolicy Bypass -File scripts/setup-dev.ps1",
     "build": "turbo run build",
     "start": "turbo run start",
     "lint": "turbo run lint",

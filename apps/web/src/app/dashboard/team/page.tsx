@@ -85,7 +85,7 @@ export default function TeamPage() {
           <CardHeader>
             <CardTitle className="text-base">Add a member</CardTitle>
             <CardDescription>
-              They need a SyncForge account already — ask them to sign up, then
+              They need a Cognix account already — ask them to sign up, then
               add them here by email.
             </CardDescription>
           </CardHeader>

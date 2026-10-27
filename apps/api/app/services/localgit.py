@@ -29,12 +29,12 @@ DEFAULT_BRANCH = "main"
 # OS indexes/scan the new .git directory.
 GIT_TIMEOUT = 60.0
 
-_AI_NAME = "SyncForge AI"
-_AI_EMAIL = "ai@syncforge.local"
+_AI_NAME = "Cognix"
+_AI_EMAIL = "ai@cognix.local"
 
 # Per-repo ignores live in .git/info/exclude so the working tree (and the studio
 # file tree) stays exactly what the user sees.
-_EXCLUDE = """# SyncForge Dev Studio sandbox — local ignores (not committed)
+_EXCLUDE = """# Cognix Dev Studio sandbox — local ignores (not committed)
 __pycache__/
 *.py[cod]
 .pytest_cache/
@@ -420,7 +420,7 @@ def commit_all(
     staged = _run(workspace_id, ["diff", "--cached", "--name-only"], check=False)
     if not (staged.stdout or "").strip():
         raise GitError("Nothing to commit — the sandbox has no changes")
-    subject = (message or "SyncForge change").strip().splitlines()[0][:200]
+    subject = (message or "Cognix change").strip().splitlines()[0][:200]
     _run(
         workspace_id,
         [*_identity_args(author_name, author_email), "commit", "-m", subject],

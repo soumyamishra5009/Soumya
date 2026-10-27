@@ -8,7 +8,7 @@ import { ThemeProvider } from "@/components/theme-provider";
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans", display: "swap" });
 
 export const metadata: Metadata = {
-  title: "SyncForge AI",
+  title: "Cognix",
   description:
     "AI-powered workspace: Meetings → Decisions → Tasks → Code → Verification",
   keywords: ["AI", "meetings", "code", "tasks", "productivity", "hackathon"],

@@ -17,6 +17,8 @@ import {
   Brain,
   Menu,
   X,
+  Activity,
+  Wand2,
 } from "lucide-react";
 
 import { AuthProvider, useAuth } from "@/components/auth-provider";
@@ -34,6 +36,8 @@ const NAV = [
   { href: "/dashboard/studio", label: "Dev Studio", icon: Code2, ready: true },
   { href: "/dashboard/agent", label: "Meeting → Code", icon: GitPullRequest, ready: true },
   { href: "/dashboard/memory", label: "Project Memory", icon: Brain, ready: true },
+  { href: "/dashboard/status", label: "Provider Status", icon: Activity, ready: true },
+  { href: "/dashboard/demo", label: "Demo Mode", icon: Wand2, ready: true },
 ];
 
 function Shell({ children }: { children: ReactNode }) {
@@ -74,7 +78,7 @@ function Shell({ children }: { children: ReactNode }) {
             href="/dashboard"
             className="text-lg font-semibold gradient-text"
           >
-            SyncForge AI
+            Cognix
           </Link>
         </div>
 
@@ -171,7 +175,7 @@ function Shell({ children }: { children: ReactNode }) {
             <div className="flex h-16 items-center justify-between border-b px-6">
               <div className="flex items-center gap-2">
                 <Sparkles className="h-5 w-5 text-primary" />
-                <span className="text-lg font-semibold gradient-text">SyncForge AI</span>
+                <span className="text-lg font-semibold gradient-text">Cognix</span>
               </div>
               <Button variant="ghost" size="icon" onClick={() => setMobileNav(false)}>
                 <X className="h-5 w-5" />

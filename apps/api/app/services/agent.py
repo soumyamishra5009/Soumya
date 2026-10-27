@@ -238,7 +238,7 @@ def _offline_plan(
 # LLM planner (with automatic fallback)
 # --------------------------------------------------------------------------
 
-AGENT_SYSTEM = """You are SyncForge's Meeting→Code agent, a staff engineer who turns
+AGENT_SYSTEM = """You are Cognix's Meeting→Code agent, a staff engineer who turns
 meeting decisions into a concrete, minimal engineering plan for ONE repository.
 
 Respond with ONLY valid JSON, no prose and no markdown fences:

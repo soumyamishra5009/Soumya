@@ -1,4 +1,4 @@
-# SyncForge AI
+# Cognix
 
 > An AI-powered workspace that automates the entire flow: **Meetings → Decisions → Tasks → Code → Verification**
 

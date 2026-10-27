@@ -319,7 +319,7 @@ SAMPLE_FILES: dict[str, str] = {
     "README.md": """# Sample project
 
 This project exists so you can try the full **Meeting → Decision → Task → Code
-→ Verification** loop inside SyncForge Dev Studio.
+→ Verification** loop inside Cognix Dev Studio.
 
 `src/calculator.py` has three deliberate problems:
 
@@ -770,7 +770,7 @@ def fallback_code_proposal(
 # LLM-backed assistance (with automatic fallback)
 # --------------------------------------------------------------------------
 
-CODE_CHAT_SYSTEM = """You are SyncForge Dev Studio, a senior engineer embedded in a
+CODE_CHAT_SYSTEM = """You are Cognix Dev Studio, a senior engineer embedded in a
 team workspace. You help with the code in front of you and with the meeting and
 task context you are given.
 
@@ -783,7 +783,7 @@ Rules:
 - If the workspace is empty, suggest creating the sample project.
 """
 
-CODE_EDIT_SYSTEM = """You are SyncForge Dev Studio, a careful senior engineer.
+CODE_EDIT_SYSTEM = """You are Cognix Dev Studio, a careful senior engineer.
 You propose the complete new contents of exactly ONE file.
 
 Respond with ONLY valid JSON, no prose and no markdown fences:

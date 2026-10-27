@@ -103,7 +103,7 @@ def run() -> int:
     r = c.post(
         "/api/v1/workspaces",
         headers=h,
-        json={"name": "SyncForge Demo", "description": "test ws"},
+        json={"name": "Cognix Demo", "description": "test ws"},
     )
     ws = r.json().get("id", "")
     check("create workspace", r.status_code == 201 and ws, f"slug={r.json().get('slug')}")

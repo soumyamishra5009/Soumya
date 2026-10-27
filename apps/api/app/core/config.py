@@ -14,7 +14,7 @@ class Settings(BaseSettings):
 
     # App
     API_V1_STR: str = "/api/v1"
-    PROJECT_NAME: str = "SyncForge AI"
+    PROJECT_NAME: str = "Cognix"
     VERSION: str = "0.1.0"
     ENVIRONMENT: str = "development"
     LOG_LEVEL: str = "info"

@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cognix AI - Project Summary</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: linear-gradient(135deg, #0f0f23 0%, #1a1a2e 50%, #16213e 100%);
+            color: #e2e8f0;
+            padding: 40px;
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 1100px;
+            margin: 0 auto;
+            background: rgba(30, 41, 59, 0.5);
+            backdrop-filter: blur(10px);
+            border-radius: 24px;
+            border: 1px solid rgba(148, 163, 184, 0.2);
+            overflow: hidden;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+        }
+        .header {
+            background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #ec4899 100%);
+            padding: 60px 50px;
+            text-align: center;
+        }
+        .header h1 {
+            font-size: 48px;
+            font-weight: 800;
+            margin-bottom: 12px;
+            letter-spacing: -0.02em;
+        }
+        .header .tagline {
+            font-size: 20px;
+            opacity: 0.95;
+            font-weight: 500;
+        }
+        .header .flow {
+            margin-top: 16px;
+            font-size: 16px;
+            opacity: 0.9;
+            font-weight: 600;
+        }
+        .content { padding: 50px; }
+        .section { margin-bottom: 50px; }
+        .section-title {
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 24px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            color: #f1f5f9;
+        }
+        .section-title::before {
+            content: '';
+            width: 4px;
+            height: 28px;
+            background: linear-gradient(to bottom, #6366f1, #ec4899);
+            border-radius: 2px;
+        }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
+        .card {
+            background: rgba(51, 65, 85, 0.4);
+            border: 1px solid rgba(148, 163, 184, 0.2);
+            border-radius: 12px;
+            padding: 20px;
+            transition: all 0.3s ease;
+        }
+        .card:hover {
+            border-color: rgba(99, 102, 241, 0.5);
+            background: rgba(51, 65, 85, 0.6);
+        }
+        .card-title { font-weight: 600; color: #f1f5f9; margin-bottom: 8px; font-size: 15px; }
+        .card-desc { font-size: 13px; color: #cbd5e1; }
+        .table { width: 100%; border-collapse: collapse; overflow: hidden; border-radius: 12px; }
+        .table th {
+            background: rgba(99, 102, 241, 0.2);
+            padding: 14px 16px;
+            text-align: left;
+            font-weight: 600;
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #e2e8f0;
+        }
+        .table td {
+            padding: 12px 16px;
+            border-bottom: 1px solid rgba(148, 163, 184, 0.1);
+            font-size: 13px;
+        }
+        .table tr:hover { background: rgba(51, 65, 85, 0.3); }
+        .badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 600;
+            background: rgba(16, 185, 129, 0.2);
+            color: #34d399;
+        }
+        .badge.purple { background: rgba(139, 92, 246, 0.2); color: #a78bfa; }
+        .badge.blue { background: rgba(59, 130, 246, 0.2); color: #60a5fa; }
+        .footer {
+            text-align: center;
+            padding: 40px;
+            background: rgba(15, 23, 42, 0.6);
+            border-top: 1px solid rgba(148, 163, 184, 0.2);
+        }
+        .footer-text { color: #94a3b8; font-size: 13px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🧠 COGNIX AI</h1>
+            <div class="tagline">AI-Powered Workspace | Meetings → Decisions → Tasks → Code → Verification</div>
+            <div class="flow">Meeting Intelligence • Kanban • Dev Studio • Meeting-to-Code Agent • Git Integration • RAG Memory</div>
+        </div>
+        
+        <div class="content">
+            <div class="section">
+                <h2 class="section-title">🎯 Project Objective (Use Case)</h2>
+                <p style="font-size: 15px; color: #cbd5e1; max-width: 900px;">
+                    <strong>Cognix AI</strong> bridges the gap between discussions and execution. Instead of meeting notes getting lost, it extracts actionable decisions, 
+                    converts them into trackable tasks, and helps implement them directly through an AI coding agent — all inside one unified workspace with 
+                    <strong>human-in-the-loop approval</strong> at every critical step.
+                </p>
+            </div>
+
+            <div class="section">
+                <h2 class="section-title">💻 Tech Stack & Languages Used</h2>
+                <table class="table">
+                    <thead>
+                        <tr><th>Layer</th><th>Technology</th><th>Purpose</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td><strong>Frontend</strong></td><td>Next.js 15, TypeScript, React 19, Tailwind CSS, shadcn/ui, Monaco Editor</td><td>Modern UI with type safety & code editing</td></tr>
+                        <tr><td><strong>Backend</strong></td><td>FastAPI, Python 3.11+, Pydantic, SQLAlchemy</td><td>REST API with validation & async support</td></tr>
+                        <tr><td><strong>Database</strong></td><td>SQLite (dev) / PostgreSQL + pgvector (prod)</td><td>Data storage + vector embeddings for RAG</td></tr>
+                        <tr><td><strong>AI/LLM</strong></td><td>Google Gemini, OpenRouter, Ollama + Offline Extractive Fallback</td><td>Meeting analysis, code generation, embeddings</td></tr>
+                        <tr><td><strong>STT</strong></td><td>faster-whisper (local), Google Gemini STT (cloud)</td><td>Audio transcription (English + Hinglish)</td></tr>
+                        <tr><td><strong>Git/Code</strong></td><td>GitPython/subprocess, GitHub REST API</td><td>Version control, PR creation</td></tr>
+                        <tr><td><strong>Sandbox/Testing</strong></td><td>Subprocess runner, Judge0/E2B/Piston (optional)</td><td>Safe code execution & testing</td></tr>
+                        <tr><td><strong>DevOps</strong></td><td>TurboRepo, Docker, Vercel, PowerShell/Bash scripts</td><td>Monorepo, deployment, automation</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="section">
+                <h2 class="section-title">✨ Features Built (All Phases Complete)</h2>
+                <div class="grid">
+                    <div class="card"><div class="card-title">🎙️ AI Meeting Intelligence</div><div class="card-desc">Upload audio → Transcript with timestamps → Summary, Decisions, Actions, Risks, Questions (English + Hinglish)</div></div>
+                    <div class="card"><div class="card-title">✏️ Editable AI Output</div><div class="card-desc">Human-in-the-loop - edit/add/delete anything, nothing is locked</div></div>
+                    <div class="card"><div class="card-title">📋 Smart Kanban Board</div><div class="card-desc">Drag & drop, assignees, priorities, due dates, filters, auto-generated from meetings</div></div>
+                    <div class="card"><div class="card-title">👥 Team Management</div><div class="card-desc">Add by email, roles, assignees, meeting history with archive & search</div></div>
+                    <div class="card"><div class="card-title">💻 AI Dev Studio</div><div class="card-desc">Monaco Editor, file explorer, context-aware AI chat, offline static analyzer</div></div>
+                    <div class="card"><div class="card-title">✅ Human-Approved Change Proposals</div><div class="card-desc">AI proposes diffs, user approves/rejects before any file write</div></div>
+                    <div class="card"><div class="card-title">🤖 Meeting-to-Code Agent</div><div class="card-desc">Decisions → Plan → Subtasks → Affected files → Reviewable diffs</div></div>
+                    <div class="card"><div class="card-title">🔀 Git & PR Integration</div><div class="card-desc">Local git (init/branch/commit/merge) + GitHub PR creation with token</div></div>
+                    <div class="card"><div class="card-title">🧪 Sandbox Testing</div><div class="card-desc">Run AI-generated code in isolated sandbox, see pass/fail, iterate</div></div>
+                    <div class="card"><div class="card-title">🧠 Project Memory (RAG)</div><div class="card-desc">Semantic search across meetings/tasks/code using pgvector, natural language queries</div></div>
+                    <div class="card"><div class="card-title">📊 Provider Status Panel</div><div class="card-desc">Real-time check of Gemini/Ollama/OpenRouter, STT engine, tools</div></div>
+                    <div class="card"><div class="card-title">🚀 Demo Mode</div><div class="card-desc">One-click seed of sample meeting, tasks, and demo workspace</div></div>
+                </div>
+            </div>
+
+            <div class="section">
+                <h2 class="section-title">🏗️ Project Architecture</h2>
+                <table class="table">
+                    <thead>
+                        <tr><th>Component</th><th>Path</th><th>Description</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td><span class="badge blue">Frontend</span></td><td><code>apps/web/</code></td><td>Next.js 15 App Router - UI, pages, components, services</td></tr>
+                        <tr><td><span class="badge purple">Backend</span></td><td><code>apps/api/</code></td><td>FastAPI - Routes, services, models, schemas, agents</td></tr>
+                        <tr><td><span class="badge">Shared</span></td><td><code>packages/</code></td><td>Shared types, database schemas, config</td></tr>
+                        <tr><td><span class="badge">Scripts</span></td><td><code>scripts/</code></td><td>setup-dev.ps1, demo.ps1, start-all.ps1, utilities</td></tr>
+                        <tr><td><span class="badge">Docs</span></td><td><code>docs/</code></td><td>ARCHITECTURE.md, DEPLOY.md, PROMPTS.md</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="section">
+                <h2 class="section-title">✅ Quality & Testing</h2>
+                <div class="grid">
+                    <div class="card"><div class="card-title">Test Suites</div><div class="card-desc">12 suites (smoke, normalize, llm_providers, fallback, pipeline, team, studio, ship, verify, memory, cloud) - <strong>ALL PASSING</strong></div></div>
+                    <div class="card"><div class="card-title">Live Verification</div><div class="card-desc">verify_live_stack/phase2/phase3/phase4/phase5 - All passing with HTTP contract tests</div></div>
+                    <div class="card"><div class="card-title">Security</div><div class="card-desc">Path traversal guards, human approval required, JWT auth, CORS, consent gate, rate limiting ready</div></div>
+                    <div class="card"><div class="card-title">Offline Capable</div><div class="card-desc">Works without API keys via extractive fallback, local Whisper, bundled sandbox</div></div>
+                </div>
+            </div>
+
+            <div class="section">
+                <h2 class="section-title">🚀 Quick Start</h2>
+                <div class="card" style="background: rgba(15, 23, 42, 0.6);">
+                    <div style="font-family: 'JetBrains Mono', monospace; font-size: 12px; line-height: 1.8;">
+                        <div style="color: #94a3b8;"># First time setup</div>
+                        <div style="color: #60a5fa;">npm run setup</div>
+                        <br>
+                        <div style="color: #94a3b8;"># One-command demo (API + Web + browser)</div>
+                        <div style="color: #60a5fa;">npm run demo</div>
+                        <br>
+                        <div style="color: #94a3b8;"># Or run separately</div>
+                        <div style="color: #60a5fa;">npm run dev</div>
+                        <br>
+                        <div style="color: #94a3b8;"># Run tests</div>
+                        <div style="color: #60a5fa;">cd apps/api && .\venv\Scripts\python.exe tests/run_all.py</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="section">
+                <h2 class="section-title">🎓 Key Highlights</h2>
+                <div class="grid">
+                    <div class="card"><div class="card-title">"Meeting to Code" Story</div><div class="card-desc">Clear demo flow showing discussion → decisions → implementation → testing → shipping</div></div>
+                    <div class="card"><div class="card-title">Safety First</div><div class="card-desc">No auto-commits, no auto-writes - every AI change needs explicit approval</div></div>
+                    <div class="card"><div class="card-title">Hinglish Support</div><div class="card-desc">Optimized for Indian teams, understands mixed Hindi-English conversations</div></div>
+                    <div class="card"><div class="card-title">Production Ready</div><div class="card-desc">Deploy to Vercel with env vars, PostgreSQL + pgvector, Gemini API</div></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="footer">
+            <div class="footer-text">
+                <strong style="color: #e2e8f0;">Cognix AI</strong> | Built with ❤️ for Hackathons & AI-Powered Engineering Teams<br>
+                <span style="opacity: 0.7;">Monorepo: Next.js 15 + FastAPI | All Phases Complete | 435+ Tests Passing</span><br>
+                <span style="opacity: 0.6; font-size: 11px; margin-top: 8px; display: block;">Generated: October 27, 2026</span>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

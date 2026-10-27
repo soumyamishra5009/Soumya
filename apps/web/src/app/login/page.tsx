@@ -121,7 +121,7 @@ export default function LoginPage() {
         <Link href="/" className="relative z-10 flex items-center gap-2 animate-fade-in-down">
           <Sparkles className="h-6 w-6 text-primary" />
           <span className="text-xl font-semibold gradient-text">
-            SyncForge AI
+            Cognix
           </span>
         </Link>
 
@@ -170,7 +170,7 @@ export default function LoginPage() {
             </CardTitle>
             <CardDescription>
               {mode === "login"
-                ? "Continue to your SyncForge workspace."
+                ? "Continue to your Cognix workspace."
                 : "Set up your workspace in seconds — no credit card."}
             </CardDescription>
           </CardHeader>

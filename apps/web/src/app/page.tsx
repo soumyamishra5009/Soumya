@@ -106,8 +106,7 @@ export default function HomePage() {
               {PIPELINE.join(" → ")}
             </div>
             <h1 className="text-4xl font-bold tracking-tight sm:text-6xl md:text-7xl animate-fade-in-up">
-              SyncForge{" "}
-              <span className="gradient-text animate-gradient">AI</span>
+              <span className="gradient-text animate-gradient">Cognix</span>
             </h1>
             <p className="mx-auto max-w-3xl text-lg text-muted-foreground sm:text-xl animate-fade-in-up stagger-2">
               Turn your meetings into actionable work. Extract decisions, create
@@ -167,7 +166,7 @@ export default function HomePage() {
       <footer className="relative border-t px-6 py-8">
         <div className="mx-auto max-w-6xl flex flex-col items-center justify-between gap-4 sm:flex-row">
           <p className="text-sm text-muted-foreground">
-            © {new Date().getFullYear()} SyncForge AI. Built for hackathons &
+            © {new Date().getFullYear()} Cognix. Built for hackathons &
             engineering teams.
           </p>
           <div className="flex gap-6 text-sm text-muted-foreground">

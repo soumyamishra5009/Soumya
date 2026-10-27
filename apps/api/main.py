@@ -38,7 +38,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="SyncForge AI API",
+    title="Cognix API",
     description="API for AI-powered Meetings → Decisions → Tasks → Code → Verification workflow",
     version="0.1.0",
     docs_url="/docs",
