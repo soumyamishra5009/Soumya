@@ -22,6 +22,9 @@
     "ACCESS_TOKEN_EXPIRE_MINUTES",
     "DATABASE_URL",
     "CORS_ORIGINS",
+    "STT_ENGINE",
+    "DEVSTUDIO_BACKEND",
+    "CODE_EXECUTOR",
     "PYTHON_VERSION"
   ],
   "tasks": {

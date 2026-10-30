@@ -191,7 +191,7 @@ def _transcribe_gemini(audio_path: str) -> dict[str, Any]:
     if not api_key:
         raise RuntimeError("GEMINI_API_KEY not configured")
 
-    model = os.getenv("GEMINI_STT_MODEL", "gemini-2.0-flash")
+    model = os.getenv("GEMINI_STT_MODEL", "gemini-3.5-flash")
     ext = os.path.splitext(audio_path)[1].lower()
     mime = mimetypes.guess_type(audio_path)[0] or "audio/mpeg"
 

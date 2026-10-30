@@ -34,7 +34,7 @@ def _gemini_provider(model: str) -> tuple[str, str, str] | None:
     if not key:
         return None
     base = os.getenv("GEMINI_BASE_URL", _DEFAULT_GEMINI_BASE).rstrip("/")
-    chosen = os.getenv("GEMINI_MODEL", "gemini-2.0-flash").strip() or "gemini-2.0-flash"
+    chosen = os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite").strip() or "gemini-3.5-flash-lite"
     return base, key, chosen
 
 
@@ -229,7 +229,7 @@ def _gemini_embeddings(texts: list[str]) -> list[list[float]] | None:
     if not key:
         return None
     base = os.getenv("GEMINI_BASE_URL", _DEFAULT_GEMINI_BASE).rstrip("/")
-    model = os.getenv("GEMINI_EMBED_MODEL", "text-embedding-004")
+    model = os.getenv("GEMINI_EMBED_MODEL", "gemini-embedding-001")
     try:
         with httpx.Client(timeout=60.0) as client:
             resp = client.post(

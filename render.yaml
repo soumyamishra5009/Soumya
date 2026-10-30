@@ -35,9 +35,9 @@ services:
       - key: GEMINI_API_KEY
         sync: false
       - key: GEMINI_MODEL
-        value: gemini-2.0-flash
+        value: gemini-3.5-flash-lite
       - key: GEMINI_EMBED_MODEL
-        value: text-embedding-004
+        value: gemini-embedding-001
       # Cloud speech-to-text (no local Whisper needed).
       - key: STT_ENGINE
         value: groq_whisper

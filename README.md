@@ -189,7 +189,7 @@ real AI (cloud, free, nothing to install) is a Google AI Studio key:
 ```powershell
 # apps\api\.env
 GEMINI_API_KEY=your-gemini-key      # https://aistudio.google.com/apikey
-GEMINI_MODEL=gemini-2.0-flash
+GEMINI_MODEL=gemini-3.5-flash-lite
 ```
 
 That's it — the API picks it up automatically. Other providers:

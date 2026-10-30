@@ -54,9 +54,11 @@ class Settings(BaseSettings):
     # set the app produces real LLM output with nothing installed locally.
     GEMINI_API_KEY: str = ""
     GEMINI_BASE_URL: str = "https://generativelanguage.googleapis.com/v1beta/openai"
-    GEMINI_MODEL: str = "gemini-2.0-flash"
+    # Newer Gemini API keys cannot access the 2.x flash models anymore, so the
+    # default points at a current stable model. Override with GEMINI_MODEL.
+    GEMINI_MODEL: str = "gemini-3.5-flash-lite"
     GEMINI_CODE_MODEL: str = ""
-    GEMINI_EMBED_MODEL: str = "text-embedding-004"
+    GEMINI_EMBED_MODEL: str = "gemini-embedding-001"
 
     # When no LLM is reachable (no Ollama, no API key) fall back to an offline
     # extractive summary so the pipeline always completes.
@@ -77,7 +79,7 @@ class Settings(BaseSettings):
     GROQ_WHISPER_MODEL: str = "whisper-large-v3"
     # Gemini speech-to-text — transcribes audio with the same Gemini key, no
     # extra service. Used on hosts that can't run a local Whisper model.
-    GEMINI_STT_MODEL: str = "gemini-2.0-flash"
+    GEMINI_STT_MODEL: str = "gemini-3.5-flash"
     
     # Storage
     STORAGE_TYPE: str = "local"

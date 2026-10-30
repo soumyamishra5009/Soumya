@@ -85,7 +85,7 @@ def run() -> int:
         os.environ["GEMINI_API_KEY"] = "g-key"
         chain = llm._provider_chain("llama3.1:8b")
         check("chain: gemini first when key set", chain[0][0].startswith("https://generativelanguage"), str(chain[0]))
-        check("chain: gemini uses its own model", chain[0][2] == "gemini-2.0-flash", chain[0][2])
+        check("chain: gemini uses its own model", chain[0][2] == "gemini-3.5-flash-lite", chain[0][2])
         check("chain: ollama retained as last resort", chain[-1][1] == "ollama", str(chain[-1]))
 
         _reset_env()
@@ -114,7 +114,7 @@ def run() -> int:
         check("chat: returns first provider content", text == "hello", text)
         check("chat: called gemini endpoint", _FakeClient.calls and "generativelanguage" in _FakeClient.calls[0][0], _FakeClient.calls[0][0] if _FakeClient.calls else "")
         check("chat: sent bearer auth", _FakeClient.calls[0][1].get("Authorization") == "Bearer g-key", str(_FakeClient.calls[0][1]))
-        check("chat: used gemini model in payload", _FakeClient.calls[0][2].get("model") == "gemini-2.0-flash", str(_FakeClient.calls[0][2].get("model")))
+        check("chat: used gemini model in payload", _FakeClient.calls[0][2].get("model") == "gemini-3.5-flash-lite", str(_FakeClient.calls[0][2].get("model")))
 
         # Gemini fails -> OpenRouter succeeds
         _reset_env()
