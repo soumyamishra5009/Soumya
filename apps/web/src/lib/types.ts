@@ -479,3 +479,32 @@ export interface MemoryStats {
   embed_sources: string[];
   max_chunks: number;
 }
+
+export interface SystemStatus {
+  llm: {
+    provider_order: string;
+    gemini: { configured: boolean; model: string };
+    openrouter: { configured: boolean; model: string };
+    ollama: { configured: boolean; base_url: string; model: string };
+  };
+  stt: {
+    engine: string;
+    whisper_model: string | null;
+    whisper_available: boolean;
+    gemini_configured: boolean;
+  };
+  env: {
+    database_url_scheme: string;
+    executor: string;
+    devstudio_backend: string;
+  };
+  tools: { ffmpeg: boolean; git: boolean };
+}
+
+export interface DemoSeedResult {
+  status: "created" | "exists";
+  workspace_id: string;
+  meeting_id: string;
+  tasks_created: number;
+  message: string;
+}

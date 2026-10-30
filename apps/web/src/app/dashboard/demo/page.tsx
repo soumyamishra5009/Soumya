@@ -6,11 +6,12 @@ import { Wand2, Sparkles, CheckCircle2, Loader2, FileAudio, KanbanSquare, Code2,
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { api } from "@/services/api";
+import { api, ApiError } from "@/lib/api";
+import type { DemoSeedResult } from "@/lib/types";
 
 export default function DemoPage() {
   const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<any>(null);
+  const [result, setResult] = useState<DemoSeedResult | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const seedDemo = async () => {
@@ -18,10 +19,10 @@ export default function DemoPage() {
     setError(null);
     setResult(null);
     try {
-      const res = await api.post("/demo/seed");
-      setResult(res.data);
-    } catch (e: any) {
-      setError(e?.response?.data?.detail || e.message || "Failed to seed demo data");
+      const res = await api.seedDemo();
+      setResult(res);
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : "Failed to seed demo data");
     } finally {
       setLoading(false);
     }
@@ -119,7 +120,7 @@ export default function DemoPage() {
             <li className="flex gap-2"><span className="font-semibold text-primary">3.</span> Go to <strong>Dev Studio</strong> → Create sample project, open calculator.py, ask AI to fix divide by zero bug, review diff & approve</li>
             <li className="flex gap-2"><span className="font-semibold text-primary">4.</span> Go to <strong>Meeting → Code</strong> - select demo meeting, Generate plan → Create proposals → Review & approve</li>
             <li className="flex gap-2"><span className="font-semibold text-primary">5.</span> Go to <strong>Ship it</strong> flow - connect local sandbox repo, create draft, open & merge (real git ops)</li>
-            <li className="flex gap-2"><span className="font-semibold text-primary">6.</span> Go to <strong>Project Memory</strong> - search "divide by zero" or "calculator" to see RAG results</li>
+            <li className="flex gap-2"><span className="font-semibold text-primary">6.</span> Go to <strong>Project Memory</strong> - search &quot;divide by zero&quot; or &quot;calculator&quot; to see RAG results</li>
           </ol>
         </CardContent>
       </Card>

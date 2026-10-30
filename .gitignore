@@ -70,3 +70,6 @@ coverage/
 
 # Generated test fixture (recreate with apps/api/tests/make-sample-audio.ps1)
 apps/api/tests/sample-meeting.wav
+
+.vercel
+.env*

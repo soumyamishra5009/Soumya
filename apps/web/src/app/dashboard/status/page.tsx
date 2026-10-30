@@ -6,28 +6,8 @@ import { Activity, CheckCircle2, XCircle, AlertCircle, RefreshCw } from "lucide-
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { api } from "@/services/api";
-
-interface SystemStatus {
-  llm: {
-    provider_order: string;
-    gemini: { configured: boolean; model: string };
-    openrouter: { configured: boolean; model: string };
-    ollama: { configured: boolean; base_url: string; model: string };
-  };
-  stt: {
-    engine: string;
-    whisper_model: string | null;
-    whisper_available: boolean;
-    gemini_configured: boolean;
-  };
-  env: {
-    database_url_scheme: string;
-    executor: string;
-    devstudio_backend: string;
-  };
-  tools: { ffmpeg: boolean; git: boolean };
-}
+import { api, ApiError } from "@/lib/api";
+import type { SystemStatus } from "@/lib/types";
 
 export default function StatusPage() {
   const [status, setStatus] = useState<SystemStatus | null>(null);
@@ -38,10 +18,10 @@ export default function StatusPage() {
     setLoading(true);
     setError(null);
     try {
-      const res = await api.get("/system/status");
-      setStatus(res.data);
-    } catch (e: any) {
-      setError(e?.response?.data?.detail || e.message || "Failed to fetch status");
+      const res = await api.getSystemStatus();
+      setStatus(res);
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : "Failed to fetch status");
     } finally {
       setLoading(false);
     }

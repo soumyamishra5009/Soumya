@@ -7,6 +7,7 @@ import type {
   CodePlan,
   CodeProposal,
   Decision,
+  DemoSeedResult,
   GitCommit,
   GitDiff,
   GitStatus,
@@ -29,6 +30,7 @@ import type {
   StudioChatResponse,
   StudioFile,
   StudioTree,
+  SystemStatus,
   Task,
   TaskPriority,
   TaskStatus,
@@ -616,6 +618,14 @@ export const api = {
       { method: "DELETE" }
     );
   },
+
+  // ---- system / demo ----
+  getSystemStatus() {
+    return request<SystemStatus>("/api/v1/system/status");
+  },
+  seedDemo() {
+    return request<DemoSeedResult>("/api/v1/demo/seed", { method: "POST" });
+  },
 };
 
 // Sandbox paths are POSIX-relative and may contain nested directories; encode
@@ -632,6 +642,7 @@ export type {
   CodePlan,
   CodeProposal,
   Decision,
+  DemoSeedResult,
   GitChangedFile,
   GitCommit,
   GitDiff,
@@ -659,6 +670,7 @@ export type {
   StudioFile,
   StudioFileNode,
   StudioTree,
+  SystemStatus,
   Task,
   Transcript,
   User,

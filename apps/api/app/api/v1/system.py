@@ -23,7 +23,8 @@ async def get_system_status(current_user=Depends(get_current_user)) -> Dict[str,
     try:
         import httpx
 
-        resp = httpx.get(f"{ollama_url}/api/tags", timeout=2.0)
+        async with httpx.AsyncClient(timeout=2.0) as client:
+            resp = await client.get(f"{ollama_url}/api/tags")
         if resp.status_code == 200:
             ollama_ok = True
     except Exception:
@@ -53,10 +54,10 @@ async def get_system_status(current_user=Depends(get_current_user)) -> Dict[str,
             "engine": stt_engine,
             "whisper_model": getattr(settings, "WHISPER_MODEL", "") if stt_engine == "whisper_local" else None,
             "whisper_available": whisper_ok,
-            "gemini_configured": gemini_ok if stt_engine == "gemini" else gemini_ok,
+            "gemini_configured": gemini_ok,
         },
         "env": {
-            "database_url_scheme": settings.DATABASE_URL.split("://")[0] if "://" in settings.DATABASE_URL else "unknown",
+            "database_url_scheme": (settings.DATABASE_URL or "").split("://")[0] or "unknown",
             "executor": getattr(settings, "CODE_EXECUTOR", "local"),
             "devstudio_backend": getattr(settings, "DEVSTUDIO_BACKEND", "disk"),
         },
