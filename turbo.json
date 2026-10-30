@@ -1,6 +1,29 @@
 {
   "$schema": "https://turbo.build/schema.json",
   "ui": "tui",
+  "globalEnv": [
+    "NODE_ENV",
+    "ENVIRONMENT",
+    "NEXT_PUBLIC_APP_NAME",
+    "NEXT_PUBLIC_APP_URL",
+    "NEXT_PUBLIC_API_URL",
+    "NEXT_TELEMETRY_DISABLED",
+    "API_URL",
+    "GEMINI_API_KEY",
+    "GEMINI_MODEL",
+    "GEMINI_STT_MODEL",
+    "GEMINI_EMBED_MODEL",
+    "OPENROUTER_API_KEY",
+    "LLM_PROVIDER_ORDER",
+    "ALLOW_EXTRACTIVE_FALLBACK",
+    "SECRET_KEY",
+    "AUTH_SECRET",
+    "ALGORITHM",
+    "ACCESS_TOKEN_EXPIRE_MINUTES",
+    "DATABASE_URL",
+    "CORS_ORIGINS",
+    "PYTHON_VERSION"
+  ],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],

@@ -42,8 +42,17 @@ import type {
   Workspace,
 } from "./types";
 
+// Base URL for every API call.
+//
+// - Dev: `NEXT_PUBLIC_API_URL=http://localhost:8000` (see apps/web/.env.local).
+// - Split deploy: set `NEXT_PUBLIC_API_URL` to the backend origin.
+// - Single deploy (Vercel `services` + rewrites, i.e. production today): leave
+//   it unset so requests stay same-origin and inherit whatever domain the
+//   deployment gets. That avoids baking a preview URL into the bundle.
+const CONFIGURED_API_URL = process.env.NEXT_PUBLIC_API_URL?.trim().replace(/\/$/, "");
+
 export const API_URL =
-  process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") || "http://localhost:8000";
+  CONFIGURED_API_URL || (typeof window === "undefined" ? "http://localhost:8000" : "");
 
 const TOKEN_KEY = "syncforge_token";
 const WORKSPACE_KEY = "syncforge_workspace";
