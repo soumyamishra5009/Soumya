@@ -1,6 +1,7 @@
 // Shared types mirroring the FastAPI response schemas (apps/api/app/schemas).
 
 export type MeetingStatus =
+  | "pending"
   | "uploading"
   | "transcribing"
   | "summarizing"

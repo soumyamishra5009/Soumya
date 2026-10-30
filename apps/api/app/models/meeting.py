@@ -24,7 +24,7 @@ class Meeting(Base):
     title: Mapped[str] = mapped_column(String(500), nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(
-        String(30), default=MeetingStatus.UPLOADING.value, nullable=False, index=True
+        String(30), default=MeetingStatus.PENDING.value, nullable=False, index=True
     )
 
     # Media

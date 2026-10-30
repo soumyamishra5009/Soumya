@@ -13,6 +13,7 @@ export const MEETING_STATUS_META: Record<
   MeetingStatus,
   { label: string; variant: BadgeVariant; pulse?: boolean }
 > = {
+  pending: { label: "Pending", variant: "secondary" },
   uploading: { label: "Uploaded", variant: "secondary" },
   transcribing: { label: "Transcribing", variant: "info", pulse: true },
   summarizing: { label: "Summarizing", variant: "info", pulse: true },

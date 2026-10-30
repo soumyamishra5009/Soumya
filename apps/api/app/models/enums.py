@@ -15,6 +15,10 @@ class WorkspaceRole(str, enum.Enum):
 
 
 class MeetingStatus(str, enum.Enum):
+    # A meeting starts empty; ``uploading`` means audio is attached but not yet
+    # processed. Keeping those apart stops the UI from treating a meeting that
+    # has no audio as "busy" forever.
+    PENDING = "pending"
     UPLOADING = "uploading"
     TRANSCRIBING = "transcribing"
     SUMMARIZING = "summarizing"
