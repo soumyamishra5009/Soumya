@@ -106,7 +106,7 @@ message and the local provider keeps working.
   as JSON vectors in `memory_chunks` (SQLite dev default; pgvector-ready for prod).
 - **Offline embeddings** use a deterministic hashing trick (word unigrams + char trigrams,
   L2-normalised, `MEMORY_EMBED_DIM=256`) so search works with no embedding server.
-  When **Gemini** (`text-embedding-004`) or Ollama (`nomic-embed-text`) is reachable,
+  When **Gemini** (`gemini-embedding-001`) or Ollama (`nomic-embed-text`) is reachable,
   real vectors are used instead (`source="llm"`).
 - Queries retrieve top-k chunks with cosine similarity ≥ `MEMORY_MIN_SCORE`.
 - Re-indexing is idempotent: unchanged chunks (by sha256) are skipped; stale chunks

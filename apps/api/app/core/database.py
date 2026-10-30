@@ -16,12 +16,26 @@ if settings.DATABASE_URL.startswith("sqlite"):
     # Required for FastAPI's threadpool usage of SQLite connections.
     _connect_args = {"check_same_thread": False}
 
-engine = create_engine(
-    settings.DATABASE_URL,
-    pool_pre_ping=True,
-    connect_args=_connect_args,
-    future=True,
-)
+_engine_kwargs: dict = {
+    "pool_pre_ping": True,
+    "connect_args": _connect_args,
+    "future": True,
+}
+
+if not settings.DATABASE_URL.startswith("sqlite"):
+    # Serverless functions fan out into many short-lived instances, so a large
+    # per-instance pool exhausts the managed Postgres connection limit (the
+    # Supabase pooler included). Keep it tiny, reuse the freshest connection
+    # first and recycle before the provider's idle timeout kills it.
+    _engine_kwargs.update(
+        pool_size=2,
+        max_overflow=2,
+        pool_timeout=10,
+        pool_recycle=300,
+        pool_use_lifo=True,
+    )
+
+engine = create_engine(settings.DATABASE_URL, **_engine_kwargs)
 
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False, future=True)
 

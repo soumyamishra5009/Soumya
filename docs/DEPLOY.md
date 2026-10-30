@@ -38,7 +38,7 @@ API **same-origin** — no CORS setup, no `NEXT_PUBLIC_API_URL`.
 | GitHub account | github.com | hosts the code, feeds the deploy |
 | Vercel account | vercel.com | hosts web + API + database binding |
 | Google AI Studio key | aistudio.google.com/apikey | **Gemini** — LLM, speech-to-text, embeddings |
-| Neon (via Vercel Marketplace) | vercel.com/marketplace | free Postgres (data survives restarts) |
+| Neon (via Vercel Marketplace) or Supabase | vercel.com/marketplace · supabase.com | free Postgres (data survives restarts) |
 
 That's the complete list. No Groq, no OpenRouter, no Ollama, no Docker.
 
@@ -68,14 +68,35 @@ git push -u main
 4. Leave the build settings alone — `vercel.json` already declares both
    services, the `/api/v1/*` routing rule, and Python function limits.
 
-## 3. Connect the database (Neon, free)
+## 3. Connect the database (Neon or Supabase, free)
+
+The API stores everything in Postgres when `DATABASE_URL` is set, and falls back
+to a SQLite file in `/tmp` (wiped on every cold start) when it is not. Any
+managed Postgres works; both options below have a free tier.
+
+**Option A — Neon via the Vercel Marketplace**
 
 1. Vercel → your project → **Storage** → **Marketplace** → **Neon** → create a
    free database and connect it to the **backend** service (all environments).
-2. Vercel injects `DATABASE_URL` automatically. The API normalises bare
-   `postgresql://…` URLs to `postgresql+psycopg2://…` on startup, so the
-   copy-pasted string just works. No migrations to run — tables are created on
-   first boot (`init_db`), including the Dev Studio file store.
+2. Vercel injects `DATABASE_URL` automatically.
+
+**Option B — Supabase**
+
+1. supabase.com → **New project** (pick the region closest to your users).
+2. Project → **Connect** → copy the **Transaction pooler** string, not the
+   direct connection: `db.<ref>.supabase.co` resolves to IPv6 only, and Vercel
+   Functions are IPv4-only, so the direct host fails with "Name or service not
+   known". The pooler host is `aws-0-<region>.pooler.supabase.com:6543`.
+3. The pooler user is `postgres.<project-ref>`, the password is the database
+   password, and the URL needs `?sslmode=require`:
+   `postgresql://postgres.<ref>:<password>@aws-0-<region>.pooler.supabase.com:6543/postgres?sslmode=require`
+4. Add it as `DATABASE_URL` on Vercel for **Production** and **Preview**.
+
+Whichever you pick: the API normalises bare `postgresql://…` URLs to
+`postgresql+psycopg2://…` and forces `sslmode=require` for remote hosts, so the
+copy-pasted string just works. No migrations to run — tables are created on
+first boot (`init_db`), including the Dev Studio file store. pgvector is not
+needed; embeddings are stored as JSON.
 
 ## 4. Set environment variables
 
@@ -84,6 +105,7 @@ Project → Settings → Environment Variables:
 | Key | Required | Value |
 |---|---|---|
 | `GEMINI_API_KEY` | **yes** | your Google AI Studio key |
+| `DATABASE_URL` | **yes** for persistence | managed Postgres URL (Neon auto-injects it; for Supabase use the IPv4 pooler + `?sslmode=require`) |
 | `GITHUB_TOKEN` | no | enables real GitHub pushes/PRs in Ship It |
 | `GEMINI_MODEL` | no | override the default Gemini chat model |
 | `LLM_PROVIDER_ORDER` | no | default `gemini,openrouter,ollama` |
@@ -98,7 +120,7 @@ configuration needed for any of this:
 | Dev Studio | `DEVSTUDIO_BACKEND=db` | the workspace tree lives in Postgres (`WorkspaceFile` rows) |
 | Verify | `CODE_EXECUTOR=local` | the bundled runner executes via subprocess in a temp dir (`/tmp` is writable on Functions) |
 | Uploads | `/tmp/syncforge-uploads` | audio is transcribed in-flight; nothing needs to persist |
-| Embeddings | Gemini `text-embedding-004` | project memory RAG with no local model |
+| Embeddings | Gemini `gemini-embedding-001` | project memory RAG with no local model |
 
 ## 5. Deploy
 
@@ -161,6 +183,6 @@ The alternative container path (Render/Fly/Railway + `Dockerfile` +
 | Audio transcription fails | Confirm `GEMINI_API_KEY`; `STT_ENGINE` is already `gemini` on Vercel. Very long files may exceed the function's max duration — trim the audio. |
 | Verify says the sandbox is empty | Open Dev Studio → *Sample project* first (the tree lives in Postgres). |
 | Verify fails on Node projects | The Python runtime has no `node` binary; Python tests are the supported cloud path (local/Docker hosts run JS tests too). |
-| `DATABASE_URL` errors at boot | The Neon integration must be attached to the **backend** service; the API accepts bare `postgresql://` strings and normalises them. |
+| `DATABASE_URL` errors at boot | Attach the database to the **backend** service. Supabase: use the IPv4 **pooler** host (`aws-0-<region>.pooler.supabase.com:6543`), not `db.<ref>.supabase.co` (IPv6-only). Bare `postgresql://` strings and missing `sslmode` are normalised automatically. |
 | Dev Studio edits don't persist | Ensure `DEVSTUDIO_BACKEND=db` is not overridden — on Vercel it's the default. |
 | Local `pip install` looks thin | By design: `requirements.txt` is the lean Vercel set — use `requirements-dev.txt` for local extras. |

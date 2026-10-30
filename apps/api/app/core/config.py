@@ -1,4 +1,5 @@
 import os
+from urllib.parse import parse_qs, urlencode, urlsplit, urlunsplit
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -175,12 +176,41 @@ settings = Settings()
 # add-ons) hand out bare "postgresql://" or "postgres://" URLs, but SQLAlchemy
 # needs an explicit dialect suffix to pick the psycopg2 driver. Normalise once
 # at import so a copy-pasted connection string just works everywhere.
+def _require_tls_for_remote_postgres(url: str) -> str:
+    """Force ``sslmode=require`` on remote Postgres URLs.
+
+    Managed providers (Supabase, Neon, RDS) terminate TLS with certificates
+    that are not always in the local trust store, and psycopg2 defaults to
+    ``sslmode=prefer``: behind a pooler that downgrade attempt can fail with a
+    confusing "server does not support SSL" error. Loopback/dev hosts keep the
+    default so a local Docker database without TLS still works.
+    """
+    if not url.startswith("postgresql"):
+        return url
+    try:
+        parts = urlsplit(url)
+    except ValueError:
+        return url
+    host = (parts.hostname or "").lower()
+    if (
+        not host
+        or host in {"localhost", "127.0.0.1", "::1", "postgres", "db"}
+        or host.endswith(".local")
+    ):
+        return url
+    query = parse_qs(parts.query, keep_blank_values=True)
+    if "sslmode" in query:
+        return url
+    query["sslmode"] = ["require"]
+    return urlunsplit(parts._replace(query=urlencode(query, doseq=True)))
+
+
 _url = settings.DATABASE_URL
 if _url.startswith("postgres://") and not _url.startswith("postgresql://"):
     _url = "postgresql://" + _url[len("postgres://"):]
 if _url.startswith("postgresql://") and not _url.startswith("postgresql+"):
     _url = "postgresql+psycopg2://" + _url[len("postgresql://"):]
-settings.DATABASE_URL = _url
+settings.DATABASE_URL = _require_tls_for_remote_postgres(_url)
 
 # Serverless scratch space: the function bundle is read-only, so uploaded
 # meeting audio and the SQLite fallback (used only when no DATABASE_URL is

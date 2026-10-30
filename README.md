@@ -208,7 +208,7 @@ That's it — the API picks it up automatically. Other providers:
 Copy `.env.example` → `apps\api\.env`. The important keys:
 
 ```ini
-DATABASE_URL=sqlite:///./syncforge.db   # dev default; use postgres+pgvector in prod
+DATABASE_URL=sqlite:///./syncforge.db   # dev default; managed Postgres in prod (TLS + dialect auto-normalised)
 STT_ENGINE=whisper_local                # or gemini (cloud, same key as the LLM)
 WHISPER_MODEL=small                     # tiny | base | small | medium | large-v3
 OLLAMA_BASE_URL=http://localhost:11434
