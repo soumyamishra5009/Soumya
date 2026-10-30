@@ -221,10 +221,18 @@ def _transcribe_gemini(audio_path: str) -> dict[str, Any]:
     data = resp.json()
 
     try:
-        text = data["candidates"][0]["content"]["parts"][0]["text"]
+        parts = data["candidates"][0]["content"]["parts"]
     except (KeyError, IndexError) as exc:
         raise RuntimeError(f"Gemini returned no transcript: {str(data)[:200]}") from exc
-    text = (text or "").strip()
+    # Gemini 3.x can return several parts, including private "thought" parts;
+    # only the real answer parts make up the transcript.
+    text = "".join(
+        str(part.get("text") or "")
+        for part in parts
+        if isinstance(part, dict) and not part.get("thought")
+    ).strip()
+    if not text:
+        raise RuntimeError(f"Gemini returned an empty transcript: {str(data)[:200]}")
 
     # Estimate duration for timestamping (best-effort; None is fine).
     duration = 0.0
